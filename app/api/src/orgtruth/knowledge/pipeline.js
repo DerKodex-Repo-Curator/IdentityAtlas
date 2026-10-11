@@ -41,6 +41,8 @@ export class CancelledError extends Error {
 export const MAX_FINDINGS_CHARS = 12_000;
 // A passage of a dozen statements is ~1,100 tokens of JSON (measured); 900 cut one off.
 export const CLAIM_REPLY_TOKENS = 1600;
+// The single-prompt baseline writes the whole transcript's statements in one reply.
+export const SINGLE_TIMEOUT_MS = 1_800_000;
 
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 32);
 export const cacheKey = (stage, user) => `${stage}:${hash(`${SYSTEM_PROMPT}\n${user}`)}`;
@@ -120,7 +122,12 @@ async function cachedAsk(ctx, stage, q) {
   }
   if (ctx.isCancelled && await ctx.isCancelled()) throw new CancelledError();
   const started = Date.now();
-  const res = await ctx.ask(q);
+  // A call that runs out of time is one failed call, like an unusable reply — not
+  // the end of the run (measured: one long reply on a 2-vCPU host took > 10 min).
+  const res = await ctx.ask(q).catch((err) => {
+    if (!/did not answer within/.test(err.message)) throw err;
+    return { ok: false, errors: [err.message], rounds: 1, timing: {} };
+  });
   const s = ctx.stats;
   const per = (s.perStage[stage] ??= { calls: 0, failed: 0, ms: 0 });
   s.calls += 1; per.calls += 1;
@@ -214,7 +221,7 @@ async function findingsStage(ctx, passages) {
 
 async function singleStage(ctx, passages) {
   const text = numbered(passages).slice(0, MAX_FINDINGS_CHARS);
-  const claims = (await cachedAsk(ctx, 'single', { user: singleMessage(text), schema: SINGLE_SCHEMA, check: (r) => checkClaims(r, LIMITS.claimsSingle), maxTokens: 2500 })) ?? [];
+  const claims = (await cachedAsk(ctx, 'single', { user: singleMessage(text), schema: SINGLE_SCHEMA, check: (r) => checkClaims(r, LIMITS.claimsSingle), maxTokens: 2500, timeoutMs: SINGLE_TIMEOUT_MS })) ?? [];
   await progress(ctx, 'single');
   for (const c of claims) {
     // The quote decides the passage: the first one it is literally in.

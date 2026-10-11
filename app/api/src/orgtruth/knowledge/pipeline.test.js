@@ -91,6 +91,19 @@ describe('runPipeline', () => {
     expect(r.claims).toHaveLength(5);
   });
 
+  it('a call that times out is one failed call; any other error still ends the run', async () => {
+    const { ask } = scripted();
+    const slowClaims = async (q) => {
+      if (q.user.includes('Extract atomic statements') && q.user.includes(P1.text)) throw new Error('the local model did not answer within 600 seconds');
+      return ask(q);
+    };
+    const r = await runPipeline({ passages: [P1, P2], ask: slowClaims });
+    expect(r.claims.map(c => c.object)).toEqual(['RDW']);
+    expect(r.errors).toContainEqual({ stage: 'claims', errors: ['the local model did not answer within 600 seconds'] });
+    const broken = async () => { throw new Error('LLM server returned 500: boom'); };
+    await expect(runPipeline({ passages: [P1], ask: broken })).rejects.toThrow('boom');
+  });
+
   it('stops between calls when cancelled', async () => {
     let asked = 0;
     const { ask } = scripted();
