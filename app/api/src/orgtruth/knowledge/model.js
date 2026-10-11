@@ -54,17 +54,36 @@ function addTiming(total, t) {
   return total;
 }
 
+// MEASURED (2026-10-11, sidekick-1): the report generator's model process was
+// OOM-killed mid-run (4 GB container limit); its supervisor reloads it on the next
+// request, which first answers 502. A transient server error is retried after a
+// pause long enough for the reload, instead of failing the whole extraction.
+export const RETRY_DELAYS_MS = [30_000, 90_000];
+const TRANSIENT = /returned 50[234]|ECONNRESET|ECONNREFUSED|socket hang up|EPIPE/;
+
+export async function chatWithRetry(args, { delays = RETRY_DELAYS_MS, sleep = (ms) => new Promise(r => setTimeout(r, ms)) } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await chat(args);
+    } catch (err) {
+      if (attempt >= delays.length || !TRANSIENT.test(err.message)) throw err;
+      console.warn(`org-knowledge: model call failed (${err.message}); retrying in ${Math.round(delays[attempt] / 1000)} s`);
+      await sleep(delays[attempt]);
+    }
+  }
+}
+
 /**
  * One stage question. `check(reply)` is the stage validator from contracts.js.
  * @returns {Promise<{ ok: boolean, value?: any, errors: string[], rounds: number, timing: object }>}
  */
-export async function ask({ user, schema, check, maxTokens = 450, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+export async function ask({ user, schema, check, maxTokens = 450, timeoutMs = DEFAULT_TIMEOUT_MS, retry = {} }) {
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: user }];
   const timing = {};
   let errors = [];
   for (let round = 1; round <= 2; round++) {
     const { content, timing: t } = await withTimeout(
-      chat({ messages, schema, maxTokens, baseUrl: modelUrl() || undefined }), timeoutMs,
+      chatWithRetry({ messages, schema, maxTokens, baseUrl: modelUrl() || undefined }, retry), timeoutMs,
       `the local model did not answer within ${Math.round(timeoutMs / 1000)} seconds`);
     addTiming(timing, t);
     const reply = parse(content);

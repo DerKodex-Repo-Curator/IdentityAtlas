@@ -89,6 +89,43 @@ describe('ask', () => {
   });
 });
 
+describe('transient model server errors', () => {
+  it('a 502 while the model reloads is retried after a pause; the answer is used', async () => {
+    let n = 0;
+    const flaky = http.createServer((req, res) => {
+      n += 1;
+      res.writeHead(n === 1 ? 502 : 200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(n === 1 ? { error: { message: 'the model server did not answer' } } : { choices: [{ message: { content: '{"topic":"customers"}' } }], timings: {} }));
+    });
+    await new Promise(r => flaky.listen(0, '127.0.0.1', r));
+    process.env.ORG_KNOWLEDGE_LLM_URL = `http://127.0.0.1:${flaky.address().port}`;
+    const waits = [];
+    const r = await ask({ user: 'T', schema: TOPIC_SCHEMA, check: checkTopic, retry: { delays: [5, 7], sleep: async (ms) => { waits.push(ms); } } });
+    await new Promise(res => flaky.close(res));
+    expect(r).toMatchObject({ ok: true, value: 'customers', rounds: 1 });
+    expect(n).toBe(2);
+    expect(waits).toEqual([5]);
+  });
+
+  it('gives up after the last pause, and never retries a non-transient error', async () => {
+    const { chatWithRetry } = await import('./model.js');
+    const down = http.createServer((_req, res) => { res.writeHead(503, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"busy"}}'); });
+    await new Promise(r => down.listen(0, '127.0.0.1', r));
+    const waits = [];
+    await expect(chatWithRetry({ messages: [], baseUrl: `http://127.0.0.1:${down.address().port}` }, { delays: [1, 2], sleep: async (ms) => { waits.push(ms); } }))
+      .rejects.toThrow(/returned 503/);
+    expect(waits).toEqual([1, 2]);
+    const bad = http.createServer((_req, res) => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"context size exceeded"}}'); });
+    await new Promise(r => bad.listen(0, '127.0.0.1', r));
+    const waits2 = [];
+    await expect(chatWithRetry({ messages: [], baseUrl: `http://127.0.0.1:${bad.address().port}` }, { delays: [1], sleep: async (ms) => { waits2.push(ms); } }))
+      .rejects.toThrow(/returned 400/);
+    expect(waits2).toEqual([]);
+    await new Promise(r => down.close(r));
+    await new Promise(r => bad.close(r));
+  });
+});
+
 it('withTimeout rejects with the message after the time', async () => {
   await expect(withTimeout(new Promise(() => {}), 10, 'too slow')).rejects.toThrow('too slow');
   await expect(withTimeout(Promise.resolve(1), 1000, 'x')).resolves.toBe(1);
