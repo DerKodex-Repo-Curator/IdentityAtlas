@@ -58,6 +58,9 @@ responsibleFor = takes care of something; worksForCustomer = does work for a cus
 usesApplication = uses software; hasProperty = object is a short description of the subject;
 other = anything else, with its meaning in "qualifier".
 When the passage lists several people, make one statement per person.
+"volgens X", "X noemt", "X zegt", "according to X" name who is SPEAKING: X is the source, never the subject.
+"het team bestaat uit A, B en C" / "the team consists of A and B" means A memberOf team, B memberOf team.
+When the speaker describes the company ("wij", "het bedrijf", the company name), the company is the subject.
 modality: stated = said plainly; implied = follows but is not said; uncertain = the speaker hedges;
 correction = the speaker corrects something said before; question = asked, not stated.
 quote: the shortest fragment of the passage that supports the statement, copied character for character.
@@ -79,13 +82,16 @@ supported = yes; unsupported = no, or it says something else; unclear = cannot t
 Reply {"verdict": "..."}`;
 }
 
-export function findingsMessage(numberedPassages) {
+const LANGUAGE_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
+
+export function findingsMessage(numberedPassages, language = null) {
+  const lang = LANGUAGE_NAMES[String(language ?? '').slice(0, 2)] ?? 'the language of the transcript';
   return `${sourceBlock('TRANSCRIPT (numbered passages):', numberedPassages)}
 
 TASK: Help the interviewer check this transcript. List
 - issues: contradictions inside the transcript (for example two different counts), names that may be misheard or misspelled, statements that are unclear;
 - questions: follow-up questions to confirm or complete the information (who exactly, since when, which system).
-Cite the passage numbers each finding is about. Write the findings in the language of the transcript. At most 8.
+Cite the passage numbers each finding is about. Write every finding in ${lang}, in one or two short sentences. At most 8.
 Reply {"findings": [{"kind": "issue" | "question", "text": "...", "passages": [1, 2]}]}`;
 }
 

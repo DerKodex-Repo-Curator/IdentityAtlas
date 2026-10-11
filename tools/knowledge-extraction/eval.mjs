@@ -37,16 +37,22 @@ export function aliaser(aliases = {}) {
 
 const allowed = (p) => (Array.isArray(p) ? p : [p]);
 
-function statementsOf(result) {
-  return (result.claims ?? []).map(c => ({
+// The reviewer's inbox: what is not rejected. The verifier only flags (it never rejects since v2);
+// --supported-only scores the statements the verifier agreed with, the 'confident' slice.
+const rejectedByVerifier = (c) => c.status === 'rejected'
+  || (SUPPORTED_ONLY && (c.evidence ?? []).length > 0 && !c.evidence.some(e => e.support === 'supported'));
+const SUPPORTED_ONLY = process.argv.includes('--supported-only');
+
+function statementsOf(result, { inbox = false } = {}) {
+  return (result.claims ?? []).filter(c => !inbox || !rejectedByVerifier(c)).map(c => ({
     s: c.subject?.label ?? c.subject, p: c.predicate, o: c.object?.label ?? c.object,
     quotes: (c.evidence ?? []).map(e => e.quote), status: c.status ?? null, support: c.support ?? null,
   }));
 }
 
-export function score(result, gold, sourceText = null) {
+export function score(result, gold, sourceText = null, { inbox = false } = {}) {
   const a = aliaser(gold.aliases);
-  const stmts = statementsOf(result);
+  const stmts = statementsOf(result, { inbox });
   const matchesGold = (st, g) => a(st.s) === a(g.s) && a(st.o) === a(g.o) && allowed(g.p).includes(st.p);
   const isTrap = (st) => (gold.traps ?? []).some(t => (!t.s || a(t.s) === a(st.s)) && (!t.o || a(t.o) === a(st.o)) && (!t.p || allowed(t.p).includes(st.p)));
   const matchedGold = new Set();
@@ -96,7 +102,9 @@ if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/').replace(/
   const gold = JSON.parse(readFileSync(opt('--gold'), 'utf8'));
   const source = opt('--source') ? readFileSync(opt('--source'), 'utf8').replace(/^﻿/, '').replace(/\r\n?/g, '\n') : null;
   const s = score(result, gold, source);
-  if (opt('--out')) writeFileSync(opt('--out'), JSON.stringify(s, null, 2));
-  console.log(`statements ${s.statements} · precision ${s.precision} · recall ${s.recall} (${s.goldFound}/${s.goldRequired}) · traps ${s.traps} · evidence ${s.evidenceExact ?? '-'}/${s.evidenceTotal ?? '-'}`);
+  const inbox = score(result, gold, source, { inbox: true });
+  if (opt('--out')) writeFileSync(opt('--out'), JSON.stringify({ all: s, inbox }, null, 2));
+  console.log(`all statements ${s.statements} · precision ${s.precision} · recall ${s.recall} (${s.goldFound}/${s.goldRequired}) · traps ${s.traps} · evidence ${s.evidenceExact ?? '-'}/${s.evidenceTotal ?? '-'}`);
+  console.log(`reviewer inbox ${inbox.statements} · precision ${inbox.precision} · recall ${inbox.recall} (${inbox.goldFound}/${inbox.goldRequired}) · traps ${inbox.traps}`);
   if (s.resolution) console.log(`resolution: top1 ${s.resolution.top1}, top3 ${s.resolution.top3}, abstained correctly ${s.resolution.abstainOk} of ${s.resolution.checked}`);
 }

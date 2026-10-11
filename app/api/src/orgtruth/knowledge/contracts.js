@@ -10,7 +10,7 @@
 // and exported with the results, so two runs are comparable only when both match.
 
 export const PIPELINE_VERSION = '0.1.0';
-export const PROMPT_VERSION = 'ke-2026-10-11.1';
+export const PROMPT_VERSION = 'ke-2026-10-11.2';
 
 export const SOURCE_FORMATS = Object.freeze(['text', 'markdown', 'srt', 'vtt']);
 export const CLASSIFICATIONS = Object.freeze(['internal', 'confidential', 'restricted']);

@@ -201,11 +201,12 @@ async function writeClaims(client, { run, source, passages, result, mentionIds }
     const to = mentionIds.get(c.objectKey);
     if (!from || !to) continue;
     const support = claimSupport(c.evidence);
-    const attrs = {
-      claimKey: c.key, qualifier: c.qualifier, modality: c.modality, topic: c.topic, support,
-      ...(support === 'unsupported' ? { rejectedBy: 'verifier' } : {}),
-    };
-    const status = support === 'unsupported' ? 'rejected' : 'proposed';
+    // MEASURED (2026-10-11, Fortigi interview): the 4B verifier called half of the
+    // correct statements unsupported, so it only lowers confidence and flags the
+    // statement; it never rejects. Hallucinations are stopped by the deterministic
+    // checks (quote in the passage, both sides in it), not by a second model opinion.
+    const attrs = { claimKey: c.key, qualifier: c.qualifier, modality: c.modality, topic: c.topic, support };
+    const status = 'proposed';
     const row = (await client.query(UPSERT_CLAIM, [randomUUID(), from, to, c.predicate, JSON.stringify(attrs), source.id,
       `passage:${c.evidence[0].seq}`, run.id, status, CONFIDENCE[support], source.observedAt])).rows[0];
     ids.set(c.key, row.id);

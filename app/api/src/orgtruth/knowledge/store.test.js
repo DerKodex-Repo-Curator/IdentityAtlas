@@ -72,7 +72,7 @@ describe('writeResults', () => {
     expect(links[0].sql).toContain('WHERE "OrgLinks"."analystOverride" IS NULL');
   });
 
-  it('statements carry claimKey, modality and support; an unsupported one is stored rejected by the verifier', async () => {
+  it('statements carry claimKey, modality and support; the verifier lowers confidence but never rejects', async () => {
     const c = client();
     const counts = await writeResults(c, { run, source, passages, result, resolutions, findings: [] });
     const claims = c.calls.filter(x => x.sql.includes('INSERT INTO "OrgRelations"'));
@@ -80,8 +80,9 @@ describe('writeResults', () => {
     expect(JSON.parse(claims[0].params[4])).toEqual({ claimKey: 'c1', qualifier: null, modality: 'stated', topic: 'membership', support: 'supported' });
     expect(claims[0].params[8]).toBe('proposed');
     expect(claims[0].params[9]).toBe(80);
-    expect(JSON.parse(claims[1].params[4]).rejectedBy).toBe('verifier');
-    expect(claims[1].params[8]).toBe('rejected');
+    expect(JSON.parse(claims[1].params[4])).toMatchObject({ support: 'unsupported' });
+    expect(JSON.parse(claims[1].params[4]).rejectedBy).toBeUndefined();
+    expect(claims[1].params[8]).toBe('proposed');
     expect(claims[1].params[9]).toBe(20);
     expect(claims[0].sql).not.toMatch(/DO UPDATE SET[^;]*"status"/);
     const evidence = c.calls.filter(x => x.sql.includes('INSERT INTO "OrgClaimEvidence"'));

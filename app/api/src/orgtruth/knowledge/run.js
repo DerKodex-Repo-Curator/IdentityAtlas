@@ -64,8 +64,9 @@ async function steps(runId, ask, startedMs) {
   details.cache = cache;
   await updateRun(runId, { status: 'running', step: 'stages', pct: 5, startedAt: now(), details });
 
+  const language = source.metadata?.language ?? 'nl';
   const result = await runPipeline({
-    passages, ask, cache, mode: details.config?.mode ?? 'pipeline',
+    passages, ask, cache, mode: details.config?.mode ?? 'pipeline', language,
     onProgress: progressWriter(runId, details),
     isCancelled: () => isCancelRequested(runId),
   });
@@ -77,7 +78,6 @@ async function steps(runId, ask, startedMs) {
   const resolutions = await resolveMentions(result.mentions);
 
   await updateRun(runId, { step: 'findings', pct: 92 });
-  const language = source.metadata?.language ?? 'nl';
   const findings = [
     ...ruleFindings({ mentions: result.mentions, resolutions, claims: result.claims, language }),
     ...modelFindings(result.findings, passages),

@@ -21,15 +21,16 @@
 // mode 'single' is the evaluation baseline (run A): one prompt over the whole
 // transcript, then only the deterministic evidence check (4a).
 //
-// `cache` maps a stage input (hash incl. PROMPT_VERSION) to its validated output; a
-// resumed run passes the previous run's cache and skips every finished call.
+// `cache` maps a question (hash of the system prompt and the exact user message) to
+// its validated answer; a resumed run passes the previous run's cache and skips every
+// call whose prompt did not change — a reworded claim prompt re-asks only the claims.
 import { createHash } from 'node:crypto';
 import {
-  PROMPT_VERSION, TOPIC_SCHEMA, MENTION_SCHEMA, CLAIM_SCHEMA, VERIFY_SCHEMA, FINDINGS_SCHEMA, SINGLE_SCHEMA,
+  TOPIC_SCHEMA, MENTION_SCHEMA, CLAIM_SCHEMA, VERIFY_SCHEMA, FINDINGS_SCHEMA, SINGLE_SCHEMA,
   checkTopic, checkMentions, checkClaims, checkVerdict, checkFindings, MENTION_TYPES, LIMITS,
 } from './contracts.js';
 import {
-  topicMessage, mentionMessage, claimMessage, verifyMessage, findingsMessage, singleMessage, numbered,
+  SYSTEM_PROMPT, topicMessage, mentionMessage, claimMessage, verifyMessage, findingsMessage, singleMessage, numbered,
 } from './prompts.js';
 import { locateQuote, labelKey, mentionedIn, splitList } from './evidence.js';
 
@@ -40,7 +41,7 @@ export class CancelledError extends Error {
 export const MAX_FINDINGS_CHARS = 12_000;
 
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 32);
-export const cacheKey = (stage, input) => `${stage}:${hash(`${PROMPT_VERSION}\n${input}`)}`;
+export const cacheKey = (stage, user) => `${stage}:${hash(`${SYSTEM_PROMPT}\n${user}`)}`;
 
 export const mentionKey = (type, label) => `${type}:${labelKey(label)}`;
 
@@ -108,15 +109,16 @@ function newStats() {
   };
 }
 
-async function cachedAsk(ctx, stage, input, question) {
-  const key = cacheKey(stage, input);
+// One stage question; the key is the exact prompt, so an unchanged prompt is never asked twice.
+async function cachedAsk(ctx, stage, q) {
+  const key = cacheKey(stage, q.user);
   if (Object.hasOwn(ctx.cache, key)) {
     ctx.stats.cached += 1;
     return ctx.cache[key];
   }
   if (ctx.isCancelled && await ctx.isCancelled()) throw new CancelledError();
   const started = Date.now();
-  const res = await question();
+  const res = await ctx.ask(q);
   const s = ctx.stats;
   const per = (s.perStage[stage] ??= { calls: 0, failed: 0, ms: 0 });
   s.calls += 1; per.calls += 1;
@@ -175,11 +177,11 @@ function addClaim(ctx, passage, c, topic) {
 }
 
 async function passageStages(ctx, p) {
-  const topic = (await cachedAsk(ctx, 'topic', p.text, () => ctx.ask({ user: topicMessage(p.text), schema: TOPIC_SCHEMA, check: checkTopic, maxTokens: 20 }))) ?? 'other';
+  const topic = (await cachedAsk(ctx, 'topic', { user: topicMessage(p.text), schema: TOPIC_SCHEMA, check: checkTopic, maxTokens: 20 })) ?? 'other';
   ctx.topics[p.seq] = topic;
   await progress(ctx, 'topics');
 
-  const mentions = (await cachedAsk(ctx, 'mentions', p.text, () => ctx.ask({ user: mentionMessage(p.text), schema: MENTION_SCHEMA, check: checkMentions, maxTokens: 400 }))) ?? [];
+  const mentions = (await cachedAsk(ctx, 'mentions', { user: mentionMessage(p.text), schema: MENTION_SCHEMA, check: checkMentions, maxTokens: 400 })) ?? [];
   const literal = [];
   for (const m of mentions) {
     const occ = occurrences(p, m.text);
@@ -189,13 +191,11 @@ async function passageStages(ctx, p) {
   }
   await progress(ctx, 'mentions');
 
-  const claimInput = `${p.text}\n${JSON.stringify(literal)}`;
-  const claims = (await cachedAsk(ctx, 'claims', claimInput, () => ctx.ask({ user: claimMessage(p.text, literal), schema: CLAIM_SCHEMA, check: checkClaims, maxTokens: 900 }))) ?? [];
+  const claims = (await cachedAsk(ctx, 'claims', { user: claimMessage(p.text, literal), schema: CLAIM_SCHEMA, check: checkClaims, maxTokens: 900 })) ?? [];
   await progress(ctx, 'claims');
 
   for (const c of groundClaims(p, claims, ctx.stats)) {
-    const verdict = (await cachedAsk(ctx, 'verify', `${c.subject}|${c.predicate}|${c.qualifier ?? ''}|${c.object}|${c.evidence.quote}`,
-      () => ctx.ask({ user: verifyMessage(c, c.evidence.quote), schema: VERIFY_SCHEMA, check: checkVerdict, maxTokens: 20 }))) ?? 'unclear';
+    const verdict = (await cachedAsk(ctx, 'verify', { user: verifyMessage(c, c.evidence.quote), schema: VERIFY_SCHEMA, check: checkVerdict, maxTokens: 20 })) ?? 'unclear';
     if (verdict === 'unsupported') ctx.stats.verifierRejected += 1;
     addClaim(ctx, p, { ...c, support: verdict, verifier: 'model' }, topic);
   }
@@ -203,16 +203,16 @@ async function passageStages(ctx, p) {
 
 async function findingsStage(ctx, passages) {
   const text = numbered(passages).slice(0, MAX_FINDINGS_CHARS);
-  const value = await cachedAsk(ctx, 'findings', text, () => ctx.ask({
-    user: findingsMessage(text), schema: FINDINGS_SCHEMA, check: (r) => checkFindings(r, passages.length), maxTokens: 900,
-  }));
+  const value = await cachedAsk(ctx, 'findings', {
+    user: findingsMessage(text, ctx.language), schema: FINDINGS_SCHEMA, check: (r) => checkFindings(r, passages.length), maxTokens: 900,
+  });
   await progress(ctx, 'findings');
   return value ?? [];
 }
 
 async function singleStage(ctx, passages) {
   const text = numbered(passages).slice(0, MAX_FINDINGS_CHARS);
-  const claims = (await cachedAsk(ctx, 'single', text, () => ctx.ask({ user: singleMessage(text), schema: SINGLE_SCHEMA, check: (r) => checkClaims(r, LIMITS.claimsSingle), maxTokens: 2500 }))) ?? [];
+  const claims = (await cachedAsk(ctx, 'single', { user: singleMessage(text), schema: SINGLE_SCHEMA, check: (r) => checkClaims(r, LIMITS.claimsSingle), maxTokens: 2500 })) ?? [];
   await progress(ctx, 'single');
   for (const c of claims) {
     // The quote decides the passage: the first one it is literally in.
@@ -230,10 +230,11 @@ async function singleStage(ctx, passages) {
  * @param {(p: { phase, done, total }) => Promise|void} [args.onProgress]
  * @param {() => Promise<boolean>|boolean} [args.isCancelled]
  * @param {'pipeline'|'single'} [args.mode]
+ * @param {string|null} [args.language]   the transcript's language: the findings are written in it
  */
-export async function runPipeline({ passages, ask, cache = {}, onProgress, isCancelled, mode = 'pipeline' }) {
+export async function runPipeline({ passages, ask, cache = {}, onProgress, isCancelled, mode = 'pipeline', language = null }) {
   const ctx = {
-    ask, cache, onProgress, isCancelled, done: 0, errors: [], stats: newStats(),
+    ask, cache, onProgress, isCancelled, language, done: 0, errors: [], stats: newStats(),
     total: mode === 'single' ? 1 : passages.length * 3 + 1,
     topics: {}, mentions: new Map(), claims: new Map(),
   };
