@@ -50,6 +50,6 @@ describe('splitList', () => {
     expect(splitList('Led, Rob, Mark en Taake')).toEqual(['Led', 'Rob', 'Mark', 'Taake']);
     expect(splitList('Anna and Bob')).toEqual(['Anna', 'Bob']);
     expect(splitList('R&D')).toEqual(['R&D']);
-    expect(splitList('Havenbedrijf Rotterdam')).toEqual(['Havenbedrijf Rotterdam']);
+    expect(splitList('Contoso Retail')).toEqual(['Contoso Retail']);
   });
 });

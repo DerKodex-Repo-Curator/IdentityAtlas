@@ -64,7 +64,7 @@ describe('chooseForMention', () => {
   const MENTION = '44444444-4444-4444-8444-444444444444';
 
   it('links a mention without candidates to an object the reviewer found', async () => {
-    queryOne.mockResolvedValueOnce({ id: MENTION, displayName: 'NUMC' }).mockResolvedValueOnce({ id: TARGET });
+    queryOne.mockResolvedValueOnce({ id: MENTION, displayName: 'Wingtip' }).mockResolvedValueOnce({ id: TARGET });
     query.mockResolvedValueOnce({ rows: [{ id: 'chosen', status: 'accepted' }] }).mockResolvedValueOnce({ rows: [] });
     const r = await reviewMatch.length; // keep reviewMatch referenced; the call under test follows
     expect(r).toBeGreaterThan(0);
@@ -72,7 +72,7 @@ describe('chooseForMention', () => {
     const out = await chooseForMention(MENTION, { targetType: 'OrgEntity', targetId: TARGET }, 'wim');
     expect(out.link.id).toBe('chosen');
     expect(queryOne.mock.calls[0][0]).toContain(`"entityType" LIKE 'Mentioned %'`);
-    expect(query.mock.calls[0][1].slice(1)).toEqual(['wim', MENTION, 'OrgEntity', TARGET, 'mention', 'NUMC']);
+    expect(query.mock.calls[0][1].slice(1)).toEqual(['wim', MENTION, 'OrgEntity', TARGET, 'mention', 'Wingtip']);
   });
 
   it('refuses an unknown mention, target type or target', async () => {
