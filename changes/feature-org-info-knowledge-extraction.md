@@ -1,0 +1,5 @@
+- Added knowledge extraction from interview transcripts (experimental, on top of Org Info): upload or paste a transcript and the deployment's own local model proposes the people, teams, customers and applications it mentions and the statements made about them, each with the exact quote from the transcript
+- Mentions are matched to existing people, accounts, groups, contexts and imported lists, with the reason for each match; ambiguous and unknown names stay open instead of being guessed
+- Reviewers confirm or reject matches and statements separately, see review questions (unknown names, self-corrections, statements that disagree with the directory) and can export everything as JSON
+- Accepted statements show up on the detail pages of the people, groups and customers they are about
+- Nothing is sent to an external AI and nothing changes access: without a local model the extraction does not start
