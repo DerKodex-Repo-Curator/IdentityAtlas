@@ -126,6 +126,26 @@ describe('transient model server errors', () => {
   });
 });
 
+describe('salvage', () => {
+  it('keeps every complete item of a reply cut off at the token cap', async () => {
+    const { salvage } = await import('./model.js');
+    const cut = '{"claims":[{"subject":"Wim","predicate":"memberOf","object":"maten"},{"subject":"Erik","predicate":"memberOf","object":"maten"},{"subject":"Ro';
+    expect(salvage(cut)).toEqual({ claims: [
+      { subject: 'Wim', predicate: 'memberOf', object: 'maten' }, { subject: 'Erik', predicate: 'memberOf', object: 'maten' },
+    ] });
+    expect(salvage('{"topic":"x"}')).toEqual({ topic: 'x' });
+    expect(salvage('no json at all')).toBeNull();
+    expect(salvage('')).toBeNull();
+  });
+
+  it('a truncated reply with complete items needs no repair round', async () => {
+    replies = ['{"mentions":[{"text":"Rob","type":"person"},{"text":"R'];
+    const { checkMentions, MENTION_SCHEMA } = await import('./contracts.js');
+    const r = await ask({ user: 'T', schema: MENTION_SCHEMA, check: checkMentions });
+    expect(r).toMatchObject({ ok: true, rounds: 1, value: [{ text: 'Rob', type: 'person' }] });
+  });
+});
+
 it('withTimeout rejects with the message after the time', async () => {
   await expect(withTimeout(new Promise(() => {}), 10, 'too slow')).rejects.toThrow('too slow');
   await expect(withTimeout(Promise.resolve(1), 1000, 'x')).resolves.toBe(1);

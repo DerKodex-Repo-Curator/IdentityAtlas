@@ -75,11 +75,18 @@ export function rankCandidates(label, ruleIndexes) {
     }));
 }
 
-/** A top candidate shared by another of the same type at the same score is ambiguous. */
+/**
+ * Ambiguous when two different objects OF ONE TYPE share the top score: "Mark" as
+ * the identity Mark van Eijken is unique, but as an account it ties with
+ * "Vries, Mark de" (measured on the Fortigi tenant) — that is two Marks. The same
+ * person as identity and as account at one score is not a tie.
+ */
 export function resolution(candidates) {
   if (candidates.length === 0) return { status: 'unmatched', candidates };
-  const [top] = candidates;
-  const tie = candidates.some(c => c !== top && c.targetType === top.targetType && c.confidence === top.confidence);
+  const top = candidates[0].confidence;
+  const atTop = candidates.filter(c => c.confidence === top);
+  const types = atTop.map(c => c.targetType);
+  const tie = types.some((t, i) => types.indexOf(t) !== i);
   return { status: tie ? 'ambiguous' : 'candidates', candidates };
 }
 

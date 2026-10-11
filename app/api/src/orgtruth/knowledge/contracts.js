@@ -52,7 +52,7 @@ export const FINDING_STATUSES = Object.freeze(['open', 'dismissed', 'resolved'])
 
 export const LIMITS = Object.freeze({
   mentionsPerPassage: 20,
-  claimsPerPassage: 12,
+  claimsPerPassage: 20,
   claimsSingle: 60,
   labelChars: 120,
   quoteChars: 400,

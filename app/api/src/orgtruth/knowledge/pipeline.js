@@ -39,6 +39,8 @@ export class CancelledError extends Error {
 }
 
 export const MAX_FINDINGS_CHARS = 12_000;
+// A passage of a dozen statements is ~1,100 tokens of JSON (measured); 900 cut one off.
+export const CLAIM_REPLY_TOKENS = 1600;
 
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 32);
 export const cacheKey = (stage, user) => `${stage}:${hash(`${SYSTEM_PROMPT}\n${user}`)}`;
@@ -191,7 +193,7 @@ async function passageStages(ctx, p) {
   }
   await progress(ctx, 'mentions');
 
-  const claims = (await cachedAsk(ctx, 'claims', { user: claimMessage(p.text, literal), schema: CLAIM_SCHEMA, check: checkClaims, maxTokens: 900 })) ?? [];
+  const claims = (await cachedAsk(ctx, 'claims', { user: claimMessage(p.text, literal), schema: CLAIM_SCHEMA, check: checkClaims, maxTokens: CLAIM_REPLY_TOKENS })) ?? [];
   await progress(ctx, 'claims');
 
   for (const c of groundClaims(p, claims, ctx.stats)) {

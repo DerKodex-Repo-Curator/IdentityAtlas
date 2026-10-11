@@ -63,6 +63,16 @@ describe('rankCandidates + resolution', () => {
     const c = [{ targetType: 'Identity', targetId: 'a', confidence: 79 }, { targetType: 'Principal', targetId: 'b', confidence: 79 }];
     expect(resolution(c).status).toBe('candidates');
   });
+
+  it('two accounts at the top score are ambiguous even when one identity is unique ("Mark")', () => {
+    const c = [
+      { targetType: 'Identity', targetId: 'mark-ve', confidence: 79 },
+      { targetType: 'Principal', targetId: 'mark-de-vries', confidence: 79 },
+      { targetType: 'Principal', targetId: 'mark-ve-acc', confidence: 79 },
+    ];
+    expect(resolution(c).status).toBe('ambiguous');
+    expect(resolution([...c.slice(0, 2), { ...c[2], confidence: 60 }]).status).toBe('candidates');
+  });
 });
 
 describe('resolveMentions', () => {

@@ -44,7 +44,30 @@ export function withTimeout(promise, ms, message) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-const parse = (content) => { try { return JSON.parse(content); } catch { return null; } };
+const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+
+/**
+ * A reply cut off at the token cap ends mid-object: `{"claims":[{…},{…},{"subj`.
+ * Keep every COMPLETE item: cut after the last closing brace and close the array
+ * and object. Measured (2026-10-11): a passage with fourteen statements ran past
+ * the cap and lost all of them, twice.
+ */
+export function salvage(content) {
+  const whole = tryParse(content);
+  if (whole !== null) return whole;
+  let end = content.lastIndexOf('}');
+  while (end > 0) {
+    const head = content.slice(0, end + 1);
+    for (const tail of [']}', '}', ']}}']) {
+      const parsed = tryParse(head + tail);
+      if (parsed !== null) return parsed;
+    }
+    end = content.lastIndexOf('}', end - 1);
+  }
+  return null;
+}
+
+const parse = (content) => salvage(String(content ?? ''));
 
 export const repairMessage = (errors) =>
   `Your reply cannot be used:\n${errors.slice(0, 8).map(e => `- ${e}`).join('\n')}\nReply again with the whole corrected JSON.`;
