@@ -29,6 +29,11 @@ describe('canonicalize', () => {
     for (const c of cues) expect(text.slice(c.startChar, c.endChar)).toBe(c.speaker ? `${c.speaker}: ${c.text}` : c.text);
   });
 
+  it('removes cue markup completely, also when a tag is rebuilt from the pieces of another', () => {
+    const { text } = canonicalize('WEBVTT\n\n00:01.000 --> 00:02.000\n<i>Rob</i> is <<b>b>maat</b>.\n', 'vtt');
+    expect(text).toBe('Rob is maat.');
+  });
+
   it('reads VTT minute:second stamps and drops cues without text', () => {
     const { cues } = canonicalize('WEBVTT\n\n00:01.500 --> 00:02.250\nhallo\n\n00:03.000 --> 00:04.000\n\n', 'vtt');
     expect(cues).toHaveLength(1);

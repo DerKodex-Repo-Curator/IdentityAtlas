@@ -45,7 +45,19 @@ function speakerOf(line) {
     const name = head.slice(head.indexOf(' ') + 1).trim();
     if (/^[.\s]/.test(head) && name) return { speaker: name, text: line.slice(close + 1).replace(/<\/v>/g, '').trim() };
   }
-  return { speaker: null, text: line.replace(/<[^>]+>/g, '').trim() };
+  return { speaker: null, text: stripTags(line).trim() };
+}
+
+// Cue markup (<i>, <c.colour>, <00:01.000>) removed until none is left, so a tag
+// rebuilt from the pieces of another ("<<i>i>") cannot survive one pass.
+export function stripTags(text) {
+  let out = String(text);
+  let prev;
+  do {
+    prev = out;
+    out = out.replace(/<[^<>]*>/g, '');
+  } while (out !== prev);
+  return out.replace(/[<>]/g, '');
 }
 
 function parseCues(body) {
