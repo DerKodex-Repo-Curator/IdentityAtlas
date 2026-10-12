@@ -14,8 +14,11 @@ vi.mock('../knowledge/read.js', () => ({
 vi.mock('../knowledge/resolve.js', () => ({ resolveMentions: vi.fn(async () => new Map([['q', { status: 'candidates', candidates: [{ label: 'Rob Visser' }] }]])) }));
 vi.mock('../knowledge/review.js', async () => {
   const actual = await vi.importActual('../knowledge/review.js');
-  return { ...actual, reviewMatch: vi.fn(), reviewClaim: vi.fn(), reviewFinding: vi.fn() };
+  return { ...actual, reviewMatch: vi.fn(), reviewClaim: vi.fn(), reviewFinding: vi.fn(), bulkReviewClaims: vi.fn() };
 });
+vi.mock('../knowledge/mentions.js', () => ({ editMention: vi.fn() }));
+vi.mock('../knowledge/corroboration.js', () => ({ rescoreSource: vi.fn(async () => ({ scored: 4, corroborated: 2, contradicted: 1 })), rescoreForMention: vi.fn(async () => ({ scored: 4, corroborated: 2, contradicted: 1 })) }));
+vi.mock('../import/sourceStore.js', () => ({ getSourceWithContent: vi.fn() }));
 vi.mock('../model/linkedTo.js', () => ({ targetsOf: vi.fn(async (t, id) => [{ targetType: t, id }, { targetType: 'Principal', id: 'acc' }]) }));
 
 import { mountRouterAs } from '../../../test-utils/routeTestKit.js';
@@ -23,7 +26,10 @@ import router from './knowledgeReview.js';
 import { getTranscript } from '../knowledge/store.js';
 import { listClaims, statementsAbout } from '../knowledge/read.js';
 import { resolveMentions } from '../knowledge/resolve.js';
-import { reviewMatch, reviewClaim, KnowledgeReviewError } from '../knowledge/review.js';
+import { reviewMatch, reviewClaim, bulkReviewClaims, KnowledgeReviewError } from '../knowledge/review.js';
+import { editMention } from '../knowledge/mentions.js';
+import { rescoreSource, rescoreForMention } from '../knowledge/corroboration.js';
+import { getSourceWithContent } from '../import/sourceStore.js';
 
 const SRC = '22222222-2222-4222-8222-222222222222';
 const ID = '33333333-3333-4333-8333-333333333333';
@@ -78,6 +84,38 @@ describe('reading', () => {
   });
 });
 
+describe('original transcript', () => {
+  it('returns the uploaded bytes for a visible transcript, 404 for a restricted one of someone else', async () => {
+    getSourceWithContent.mockResolvedValue({ id: SRC, fileName: 'wim.srt', mimeType: 'text/plain', content: Buffer.from('1\n00:00:01,000 --> 00:00:02,000\nhoi\n') });
+    const res = await request(app).get(`/api/org-truth/knowledge/sources/${SRC}/original`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('wim.srt');
+    expect(res.text).toContain('00:00:01,000');
+    getTranscript.mockResolvedValue({ id: SRC, uploadedBy: 'gregor', metadata: { classification: 'restricted' } });
+    expect((await request(app).get(`/api/org-truth/knowledge/sources/${SRC}/original`)).status).toBe(404);
+  });
+});
+
+describe('editing a mention and bulk review', () => {
+  it('passes the edit and the bulk decision through', async () => {
+    editMention.mockResolvedValue({ mention: { id: ID, label: 'Fortigi' }, candidates: [] });
+    const ed = await request(app).put(`/api/org-truth/knowledge/mentions/${ID}`).send({ label: 'Fortigi', type: 'organisation', extra: 1 });
+    expect(ed.body.mention.label).toBe('Fortigi');
+    expect(editMention).toHaveBeenCalledWith(ID, { label: 'Fortigi', type: 'organisation' }, 'wim');
+    expect(rescoreForMention).toHaveBeenCalledWith(ID);
+    expect(ed.body.confidence).toEqual({ scored: 4, corroborated: 2, contradicted: 1 });
+    const rs = await request(app).post(`/api/org-truth/knowledge/sources/${SRC}/rescore`);
+    expect(rs.body).toEqual({ scored: 4, corroborated: 2, contradicted: 1 });
+    expect(rescoreSource).toHaveBeenCalledWith(SRC);
+    bulkReviewClaims.mockResolvedValue({ status: 'rejected', updated: 3, ids: [] });
+    const bulk = await request(app).put(`/api/org-truth/knowledge/sources/${SRC}/claims/bulk`).send({ status: 'rejected', ids: [ID] });
+    expect(bulk.body.updated).toBe(3);
+    expect(bulkReviewClaims).toHaveBeenCalledWith(SRC, { status: 'rejected', ids: [ID] }, 'wim');
+    bulkReviewClaims.mockRejectedValue(new KnowledgeReviewError(400, 'status must be accepted or rejected.'));
+    expect((await request(app).put(`/api/org-truth/knowledge/sources/${SRC}/claims/bulk`).send({ status: 'x' })).status).toBe(400);
+  });
+});
+
 describe('deciding', () => {
   it.each([
     ['put', `/api/org-truth/knowledge/matches/${ID}`],
@@ -91,6 +129,7 @@ describe('deciding', () => {
     reviewMatch.mockResolvedValue({ link: { id: ID, status: 'accepted' } });
     const ok = await request(app).put(`/api/org-truth/knowledge/matches/${ID}`).send({ action: 'confirm' });
     expect(ok.body).toEqual({ link: { id: ID, status: 'accepted' } });
+    expect(rescoreForMention).not.toHaveBeenCalled(); // the stub link carries no orgEntityId
     expect(reviewMatch).toHaveBeenCalledWith(ID, { action: 'confirm' }, 'wim');
     reviewClaim.mockRejectedValue(new KnowledgeReviewError(409, 'already decided'));
     const conflict = await request(app).put(`/api/org-truth/knowledge/claims/${ID}`).send({ status: 'accepted', expectedStatus: 'proposed' });

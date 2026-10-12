@@ -11,6 +11,7 @@ import { query } from '../../db/connection.js';
 import { TARGET_TABLES } from '../linking/candidates.js';
 import { MENTION_ENTITY_TYPES, PIPELINE_VERSION, PROMPT_VERSION, PREDICATES, PREDICATE_LABELS } from './contracts.js';
 import { getTranscript, getPassages } from './store.js';
+import { bandOf } from './confidence.js';
 
 const MENTION_TYPES_SQL = `ARRAY[${Object.values(MENTION_ENTITY_TYPES).map(t => `'${t}'`).join(',')}]::text[]`;
 
@@ -57,14 +58,15 @@ export async function listMentions(sourceId) {
   return mentions.map(m => ({
     id: m.id, type: m.attributes?.mentionType ?? null, label: m.displayName, resolution: m.attributes?.resolution ?? null,
     occurrences: m.attributes?.occurrences ?? [], origin: m.attributes?.mentionOrigin ?? 'model',
+    originalLabel: m.attributes?.originalLabel ?? null, renamedBy: m.attributes?.renamedBy ?? null,
     candidates: links.filter(l => l.orgEntityId === m.id).map(l => candidateOf(l, names)),
   }));
 }
 
 const CLAIMS_SQL = `
   SELECT r."id", r."predicate", r."attributes", r."status", r."confidence", r."fromEntityId", r."toEntityId", r."runId",
-         f."displayName" AS "subject", f."attributes"->>'mentionType' AS "subjectType",
-         t."displayName" AS "object", t."attributes"->>'mentionType' AS "objectType"
+         f."displayName" AS "subject", f."attributes"->>'mentionType' AS "subjectType", f."attributes"->>'originalLabel' AS "subjectOriginal",
+         t."displayName" AS "object", t."attributes"->>'mentionType' AS "objectType", t."attributes"->>'originalLabel' AS "objectOriginal"
     FROM "OrgRelations" r
     JOIN "OrgEntities" f ON f."id" = r."fromEntityId"
     JOIN "OrgEntities" t ON t."id" = r."toEntityId"
@@ -84,8 +86,9 @@ export async function listClaims(sourceId, { status = null } = {}) {
     id: r.id, predicate: r.predicate, qualifier: r.attributes?.qualifier ?? null, modality: r.attributes?.modality ?? null,
     topic: r.attributes?.topic ?? null, support: r.attributes?.support ?? null, status: r.status,
     rejectedBy: r.attributes?.rejectedBy ?? null, edited: r.attributes?.edited ?? null, confidence: r.confidence,
-    subject: { mentionId: r.fromEntityId, label: r.subject, type: r.subjectType },
-    object: { mentionId: r.toEntityId, label: r.object, type: r.objectType },
+    band: bandOf(r.confidence ?? 0), corroboration: r.attributes?.corroboration ?? null, confidenceParts: r.attributes?.confidenceParts ?? null,
+    subject: { mentionId: r.fromEntityId, label: r.subject, type: r.subjectType, originalLabel: r.subjectOriginal ?? null },
+    object: { mentionId: r.toEntityId, label: r.object, type: r.objectType, originalLabel: r.objectOriginal ?? null },
     evidence: ev.filter(e => e.relationId === r.id).map(e => ({
       id: e.id, seq: e.seq, startChar: e.startChar, endChar: e.endChar, quote: e.quote, support: e.support, verifier: e.verifier,
     })),

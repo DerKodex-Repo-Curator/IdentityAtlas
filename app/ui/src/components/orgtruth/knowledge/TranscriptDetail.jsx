@@ -20,7 +20,7 @@ import ExportButton from './ExportButton';
 import StatementsSection from './StatementsSection';
 import MentionsSection from './MentionsSection';
 import FindingsSection from './FindingsSection';
-import SourcePassages from './SourcePassages';
+import SourceSection from './SourceSection';
 
 const TABS = [
   { key: 'statements', label: 'Statements' },
@@ -45,7 +45,7 @@ function metaLine(source) {
 function Section({ tab, source, canEdit, onOpenDetail }) {
   if (tab === 'mentions') return <MentionsSection sourceId={source.id} canEdit={canEdit} onOpenDetail={onOpenDetail} />;
   if (tab === 'findings') return <FindingsSection sourceId={source.id} canEdit={canEdit} />;
-  if (tab === 'source') return <SourcePassages passages={source.passages} />;
+  if (tab === 'source') return <SourceSection source={source} />;
   return <StatementsSection sourceId={source.id} passages={source.passages} canEdit={canEdit} />;
 }
 

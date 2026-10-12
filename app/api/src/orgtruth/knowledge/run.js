@@ -13,6 +13,8 @@ import { tx } from '../../db/connection.js';
 import { ask as modelAsk, modelStatus } from './model.js';
 import { runPipeline, CancelledError } from './pipeline.js';
 import { resolveMentions } from './resolve.js';
+import { renamedMentions } from './mentions.js';
+import { rescoreSource } from './corroboration.js';
 import { ruleFindings, modelFindings, directoryFindings } from './findings.js';
 import {
   getRun, getTranscript, getPassages, updateRun, isCancelRequested, latestCache, writeResults,
@@ -75,17 +77,22 @@ async function steps(runId, ask, startedMs) {
   details.errors = result.errors;
 
   await updateRun(runId, { step: 'resolve', pct: 88, details });
-  const resolutions = await resolveMentions(result.mentions);
+  // A mention the reviewer renamed or retyped is matched (and asked about) under its new name.
+  const edits = await renamedMentions(source.id);
+  const effective = result.mentions.map(m => (edits.has(m.key) ? { ...m, ...edits.get(m.key) } : m));
+  const resolutions = await resolveMentions(effective);
 
   await updateRun(runId, { step: 'findings', pct: 92 });
   const findings = [
-    ...ruleFindings({ mentions: result.mentions, resolutions, claims: result.claims, language }),
+    ...ruleFindings({ mentions: effective, resolutions, claims: result.claims, language }),
     ...modelFindings(result.findings, passages),
     ...await directoryFindings({ claims: result.claims, resolutions, language }),
   ];
 
   await updateRun(runId, { step: 'write', pct: 96 });
   const written = await tx(client => writeResults(client, { run, source, passages, result, resolutions, findings }));
+  // confidence + corroboration by the existing data, over every statement of the source
+  written.confidence = await rescoreSource(source.id);
   details.finishedAt = now();
   return { stats: summary(result, written, status.model, startedMs), details };
 }

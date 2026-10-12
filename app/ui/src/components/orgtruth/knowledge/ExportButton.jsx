@@ -2,10 +2,10 @@
 // The server names the file through Content-Disposition.
 import { useAuth } from '@ui/auth/AuthGate';
 import { useDialog } from '@ui/components/dialogContext';
-import { triggerDownload, filenameFromDisposition } from '@ui/utils/download';
 import { API } from '@ui/components/orgtruth/wizard/wizardApi';
 import { SMALL_BUTTON } from '@ui/components/orgtruth/orgUi';
 import { KNOWLEDGE } from './knowledgeFormat';
+import { downloadFile } from './knowledgeDownload';
 
 export default function ExportButton({ source }) {
   const { authFetch } = useAuth();
@@ -13,10 +13,7 @@ export default function ExportButton({ source }) {
 
   async function exportJson() {
     try {
-      const res = await authFetch(`${API}${KNOWLEDGE}/sources/${encodeURIComponent(source.id)}/export`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      triggerDownload(filenameFromDisposition(res.headers?.get?.('Content-Disposition')) || `knowledge-${source.id}.json`, blob);
+      await downloadFile(authFetch, `${API}${KNOWLEDGE}/sources/${encodeURIComponent(source.id)}/export`, `knowledge-${source.id}.json`);
     } catch (err) {
       dialog.alert(`The export failed: ${err.message}`);
     }

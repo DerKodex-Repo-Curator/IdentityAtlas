@@ -26,7 +26,7 @@ let systemId;
 let sourceId;
 const ids = {
   anna: randomUUID(), tom: randomUUID(), hassan: randomUUID(), maria: randomUUID(), mariaAcc: randomUUID(),
-  sgFinance: randomUUID(), listSource: randomUUID(), northwind: randomUUID(),
+  sgFinance: randomUUID(), listSource: randomUUID(), northwind: randomUUID(), victor: randomUUID(), victorAcc: randomUUID(), tier0: randomUUID(),
 };
 
 async function waitForRun(runId) {
@@ -61,6 +61,12 @@ beforeAll(async () => {
   await pool.query(`INSERT INTO "Principals" ("id", "systemId", "displayName", "email", "principalType") VALUES ($1, $2, 'Maria Novak', 'maria@demo.example', 'User')`, [ids.mariaAcc, systemId]);
   await pool.query(`INSERT INTO "IdentityMembers" ("identityId", "principalId") VALUES ($1, $2)`, [ids.maria, ids.mariaAcc]);
   await pool.query(`INSERT INTO "Resources" ("id", "systemId", "displayName", "resourceType") VALUES ($1, $2, 'SG-Finance', 'Group')`, [ids.sgFinance, systemId]);
+  // Victor IS in SG-Admin-Tier0: the directory confirms what the interview says about him
+  await pool.query(`INSERT INTO "Identities" ("id", "displayName") VALUES ($1, 'Victor Wang')`, [ids.victor]);
+  await pool.query(`INSERT INTO "Principals" ("id", "systemId", "displayName", "email", "principalType") VALUES ($1, $2, 'Victor Wang', 'victor@demo.example', 'User')`, [ids.victorAcc, systemId]);
+  await pool.query(`INSERT INTO "IdentityMembers" ("identityId", "principalId") VALUES ($1, $2)`, [ids.victor, ids.victorAcc]);
+  await pool.query(`INSERT INTO "Resources" ("id", "systemId", "displayName", "resourceType") VALUES ($1, $2, 'SG-Admin-Tier0', 'Group')`, [ids.tier0, systemId]);
+  await pool.query(`INSERT INTO "ResourceAssignments" ("resourceId", "principalId", "assignmentType", "principalType", "systemId") VALUES ($1, $2, 'Direct', 'User', $3)`, [ids.tier0, ids.victorAcc, systemId]);
   // an imported customer list (Org Info), the thing a customer mention must find
   await pool.query(`INSERT INTO "OrgSources" ("id", "kind", "displayName", "observedAt") VALUES ($1, 'list', 'Klanten', now())`, [ids.listSource]);
   await pool.query(`INSERT INTO "OrgEntities" ("id", "entityType", "displayName", "sourceId", "origin", "status", "observedAt")
@@ -69,8 +75,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await pool.query(`DELETE FROM "OrgSources" WHERE "id" = ANY($1::uuid[])`, [[ids.listSource, sourceId].filter(Boolean)]);
-  await pool.query(`DELETE FROM "IdentityMembers" WHERE "identityId" = $1`, [ids.maria]);
-  await pool.query(`DELETE FROM "Identities" WHERE "id" = ANY($1::uuid[])`, [[ids.anna, ids.tom, ids.hassan, ids.maria]]);
+  await pool.query(`DELETE FROM "ResourceAssignments" WHERE "systemId" = $1`, [systemId]);
+  await pool.query(`DELETE FROM "IdentityMembers" WHERE "identityId" = ANY($1::uuid[])`, [[ids.maria, ids.victor]]);
+  await pool.query(`DELETE FROM "Identities" WHERE "id" = ANY($1::uuid[])`, [[ids.anna, ids.tom, ids.hassan, ids.maria, ids.victor]]);
   await pool.query(`DELETE FROM "Resources" WHERE "systemId" = $1`, [systemId]);
   await pool.query(`DELETE FROM "Principals" WHERE "systemId" = $1`, [systemId]);
   await pool.query(`DELETE FROM "Systems" WHERE "id" = $1`, [systemId]);
@@ -154,6 +161,45 @@ describe('knowledge extraction on the demo interview', () => {
     expect(about[0]).toMatchObject({ sourceName: 'Demo interview', quote: expect.stringContaining('Maria Novak zit in de groep SG-Finance') });
   });
 
+  it('scores every statement against the data: the directory confirms Victor, contradicts Maria', async () => {
+    const claims = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/claims`)).body;
+    const victor = claims.find(c => c.subject.label === 'Victor Wang' && c.object.label === 'SG-Admin-Tier0');
+    expect(victor.corroboration).toEqual({ verdict: 'corroborated', kind: 'directory', detail: 'member of the group "SG-Admin-Tier0"' });
+    expect(victor.confidence).toBeGreaterThanOrEqual(80);
+    expect(victor.band).toBe('high');
+    const maria = claims.find(c => c.subject.label === 'Maria Novak');
+    expect(maria.corroboration.verdict).toBe('contradicted');
+    expect(maria.confidence).toBeLessThanOrEqual(25);
+    for (const c of claims) expect(c.confidence).toBeGreaterThanOrEqual(0);
+  });
+
+  it('accepts a whole confidence group at once, and never flips a decided statement', async () => {
+    const claims = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/claims?status=proposed`)).body;
+    const high = claims.filter(c => c.band === 'high').map(c => c.id);
+    expect(high.length).toBeGreaterThan(0);
+    const res = await agent.put(`/api/org-truth/knowledge/sources/${sourceId}/claims/bulk`).send({ status: 'accepted', ids: high });
+    expect(res.body).toMatchObject({ status: 'accepted', updated: high.length });
+    const again = await agent.put(`/api/org-truth/knowledge/sources/${sourceId}/claims/bulk`).send({ status: 'rejected', ids: high });
+    expect(again.body.updated).toBe(0);
+  });
+
+  it('a renamed mention changes everywhere and keeps the transcript spelling', async () => {
+    const m = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/mentions`)).body.find(x => x.label === 'Fortigi Demo');
+    const res = await agent.put(`/api/org-truth/knowledge/mentions/${m.id}`).send({ label: 'Fortigi Demo Corp', type: 'organisation' });
+    expect(res.body.mention).toMatchObject({ label: 'Fortigi Demo Corp', type: 'organisation', originalLabel: 'Fortigi Demo' });
+  });
+
+  it('serves the original file, and a restricted transcript can still be downloaded by whoever may see it', async () => {
+    const orig = await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/original`);
+    expect(orig.status).toBe(200);
+    expect(orig.text).toBe(TEXT);
+    const secret = await agent.post('/api/org-truth/knowledge/sources').send({ text: 'Een vertrouwelijk gesprek over iets anders.', classification: 'restricted' });
+    expect(secret.status).toBe(201);
+    // auth is off in the contract app, so everyone may see it — the refusal itself is unit-tested
+    expect((await agent.get(`/api/org-truth/sources/${secret.body.id}/download`)).status).toBe(200);
+    await agent.delete(`/api/org-truth/sources/${secret.body.id}`);
+  });
+
   it('a second run adds nothing and keeps every decision', async () => {
     const before = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/claims`)).body;
     const run = await extract();
@@ -161,8 +207,12 @@ describe('knowledge extraction on the demo interview', () => {
     const after = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/claims`)).body;
     expect(after.map(c => c.id).sort()).toEqual(before.map(c => c.id).sort());
     expect(after.find(c => c.subject.label === 'Maria Novak').status).toBe('accepted');
-    const maria = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/mentions`)).body.find(m => m.label === 'Maria Novak');
+    const mentions = (await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/mentions`)).body;
+    const maria = mentions.find(m => m.label === 'Maria Novak');
     expect(maria.candidates.find(c => c.targetId === ids.maria)).toMatchObject({ status: 'accepted', analystOverride: 'confirmed' });
+    // the reviewer's name survived the re-run; the transcript's spelling did not come back
+    expect(mentions.find(m => m.label === 'Fortigi Demo Corp')).toMatchObject({ type: 'organisation', originalLabel: 'Fortigi Demo' });
+    expect(mentions.some(m => m.label === 'Fortigi Demo')).toBe(false);
     const { rows } = await pool.query(`SELECT count(*)::int AS n FROM "OrgEntities" WHERE "sourceId" = $1`, [sourceId]);
     expect(rows[0].n).toBe((await agent.get(`/api/org-truth/knowledge/sources/${sourceId}/mentions`)).body.length);
   });

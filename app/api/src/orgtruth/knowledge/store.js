@@ -127,10 +127,17 @@ const UPSERT_MENTION = `
                              "origin", "status", "observedAt", "createdBy")
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'model', 'proposed', $9, 'knowledge-extraction')
   ON CONFLICT ("sourceId", "entityType", "canonicalKey") WHERE "profileId" IS NULL AND "origin" = 'model' AND "canonicalKey" IS NOT NULL
-  DO UPDATE SET "attributes" = EXCLUDED."attributes", "runId" = EXCLUDED."runId", "displayName" = EXCLUDED."displayName"
+  DO UPDATE SET "runId" = EXCLUDED."runId",
+    -- a reviewer's name and type (knowledge/mentions.js) survive a re-run
+    "displayName" = CASE WHEN "OrgEntities"."attributes" ? 'renamedBy' THEN "OrgEntities"."displayName" ELSE EXCLUDED."displayName" END,
+    "attributes" = EXCLUDED."attributes" || jsonb_strip_nulls(jsonb_build_object(
+      'originalLabel', "OrgEntities"."attributes"->'originalLabel', 'renamedBy', "OrgEntities"."attributes"->'renamedBy',
+      'renamedAt', "OrgEntities"."attributes"->'renamedAt', 'typeChangedBy', "OrgEntities"."attributes"->'typeChangedBy',
+      'label', CASE WHEN "OrgEntities"."attributes" ? 'renamedBy' THEN "OrgEntities"."attributes"->'label' END,
+      'mentionType', CASE WHEN "OrgEntities"."attributes" ? 'typeChangedBy' THEN "OrgEntities"."attributes"->'mentionType' END))
   RETURNING "id"`;
 
-const UPSERT_LINK = `
+export const UPSERT_LINK = `
   INSERT INTO "OrgLinks" ("id", "orgEntityId", "targetType", "targetId", "confidence", "signals", "matchedField", "matchedValue",
                           "origin", "status", "runId", "via", "orgValue")
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'model', 'proposed', $9, $10, $11)

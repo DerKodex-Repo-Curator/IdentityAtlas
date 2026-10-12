@@ -44,7 +44,9 @@
     "src/components/orgtruth/templateCanvas.js",
     "src/components/orgtruth/enrichment.js",
     "src/components/orgtruth/knowledge/knowledgeFormat.js",
-    "src/components/orgtruth/knowledge/useKnowledgeDecision.js"
+    "src/components/orgtruth/knowledge/useKnowledgeDecision.js",
+    "src/components/orgtruth/knowledge/knowledgeDownload.js",
+    "src/components/orgtruth/knowledge/useStatementBulk.js"
   ],
   "mutationExclusions": {
     "src/components/orgtruth/OrgConditionPicker.jsx": "The matrix wizard's + Organisation dialog: three useFetch calls (kinds, filter options, entity search) and the checkbox lists they fill. Every decision about the condition it hands back (required type, empty values, via omitted when all links are ticked, labels) is buildOrgCondition()/viasForSide() in orgCondition.js (mutated); OrgConditionPicker.mount.test.jsx asserts the exact condition JSON per path.",
@@ -99,7 +101,12 @@
     "src/components/orgtruth/knowledge/StatementsSection.jsx": "Presentational: renders the props and calls its callbacks; the decisions it sends (request URLs and bodies) are asserted in the knowledge mount tests, and the pure helpers it uses live in knowledgeFormat.js (mutated). File: StatementsSection.jsx.",
     "src/components/orgtruth/knowledge/TranscriptDetail.jsx": "Composition of the detail sub-tabs and the run panel; every request it makes is asserted in TranscriptDetail.mount.test.jsx.",
     "src/components/orgtruth/knowledge/TranscriptForm.jsx": "Presentational: renders the props and calls its callbacks; the decisions it sends (request URLs and bodies) are asserted in the knowledge mount tests, and the pure helpers it uses live in knowledgeFormat.js (mutated). File: TranscriptForm.jsx.",
-    "src/components/orgtruth/knowledge/TranscriptList.jsx": "Presentational: renders the props and calls its callbacks; the decisions it sends (request URLs and bodies) are asserted in the knowledge mount tests, and the pure helpers it uses live in knowledgeFormat.js (mutated). File: TranscriptList.jsx."
+    "src/components/orgtruth/knowledge/TranscriptList.jsx": "Presentational: renders the props and calls its callbacks; the decisions it sends (request URLs and bodies) are asserted in the knowledge mount tests, and the pure helpers it uses live in knowledgeFormat.js (mutated). File: TranscriptList.jsx.",
+    "src/components/orgtruth/knowledge/BulkButtons.jsx": "Presentational: the Accept all N / Reject all N pair; the count is proposedIds() in knowledgeFormat.js and the confirm + PUT are useStatementBulk.js (both mutated); TranscriptReview.mount.test.jsx asserts the exact ids sent.",
+    "src/components/orgtruth/knowledge/MentionEditForm.jsx": "Presentational rename form (name input, type select); the body is mentionEditBody() in knowledgeFormat.js (mutated) and TranscriptReview.mount.test.jsx asserts the exact PUT body from a statement and from the Mentions tab.",
+    "src/components/orgtruth/knowledge/MentionSide.jsx": "Presentational side of a statement: name, type pill, the transcript spelling from renamedFrom() (mutated) and the Rename toggle; TranscriptReview.mount.test.jsx asserts the label shown and the PUT sent.",
+    "src/components/orgtruth/knowledge/StatementScore.jsx": "Presentational confidence and corroboration pills; band, colour, verdict words and parts text are knowledgeFormat.js functions (mutated), and TranscriptReview.mount.test.jsx asserts the pill colours, title and detail.",
+    "src/components/orgtruth/knowledge/SourceSection.jsx": "Presentational Passages / Full text toggle and the download button; the download is knowledgeDownload.js (mutated) and TranscriptReview.mount.test.jsx asserts the verbatim text and the /original request."
   },
   "thresholds": {
     "high": 90,

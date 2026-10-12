@@ -14,7 +14,7 @@
 // the same decision to other mentions with the same text: "Rob" in the next interview
 // may be another Rob. Every change is in _history (the triggers on these tables).
 import { randomUUID } from 'node:crypto';
-import { queryOne, tx } from '../../db/connection.js';
+import { query, queryOne, tx } from '../../db/connection.js';
 import { isUuid } from '../import/httpHelpers.js';
 import { TARGET_TABLES } from '../linking/candidates.js';
 import { PREDICATES, FINDING_STATUSES, LIMITS } from './contracts.js';
@@ -91,6 +91,29 @@ export async function chooseForMention(mentionId, { targetType, targetId } = {},
     await client.query(REJECT_OPEN_SQL, [mention.id, chosen.id]);
     return { link: chosen };
   });
+}
+
+const BULK_SQL = `
+  UPDATE "OrgRelations"
+     SET "status" = $2,
+         "attributes" = ("attributes" - 'rejectedBy') || jsonb_build_object('reviewedBy', $3::text, 'reviewedAt', $4::text, 'bulk', true)
+   WHERE "sourceId" = $1 AND "attributes" ? 'claimKey' AND "status" = 'proposed'
+     AND ($5::uuid[] IS NULL OR "id" = ANY($5::uuid[]))
+  RETURNING "id"`;
+
+/**
+ * "Accept (or reject) all the rest": every statement of this transcript that is
+ * STILL proposed — limited to `ids` (what the reviewer was looking at) when given.
+ * A statement someone already decided is never flipped.
+ */
+export async function bulkReviewClaims(sourceId, { status, ids } = {}, actor) {
+  if (!isUuid(sourceId)) throw new KnowledgeReviewError(400, 'The transcript id must be a UUID.');
+  if (!['accepted', 'rejected'].includes(status)) throw new KnowledgeReviewError(400, 'status must be accepted or rejected.');
+  if (ids !== undefined && (!Array.isArray(ids) || ids.length > 1000 || !ids.every(isUuid))) {
+    throw new KnowledgeReviewError(400, 'ids must be a list of at most 1000 statement ids.');
+  }
+  const rows = (await query(BULK_SQL, [sourceId, status, actor, new Date().toISOString(), ids ?? null])).rows;
+  return { status, updated: rows.length, ids: rows.map(r => r.id) };
 }
 
 const CLAIM_SQL = `SELECT "id", "status", "predicate", "attributes" FROM "OrgRelations" WHERE "id" = $1 AND "attributes" ? 'claimKey'`;

@@ -2,26 +2,20 @@
 // support / status, the exact quotes, and the reviewer's buttons. Accept and
 // Reject send the status the reviewer saw as expectedStatus, so a statement
 // someone else already decided is refused (409) instead of overwritten. Edit
-// changes the predicate and qualifier and keeps the status.
+// changes the predicate and qualifier and keeps the status. Each side can be
+// renamed (MentionSide); the score sits under the badges (StatementScore).
 //
-// Props: { claim, passages, canEdit, busy, onDecide(claim, body) }
+// Props: { claim, passages, canEdit, busy, onDecide(claim, body), onRename(mentionId, body) }
 import { useState } from 'react';
 import { pillColorClass } from '@ui/components/orgtruth/orgFormat';
-import { StatusPill, TypePill, INPUT, SMALL_BUTTON } from '@ui/components/orgtruth/orgUi';
+import { StatusPill, INPUT, SMALL_BUTTON } from '@ui/components/orgtruth/orgUi';
 import { PREDICATES, predicateLabel, modalityColor, supportColor } from './knowledgeFormat';
 import EvidenceQuote from './EvidenceQuote';
+import MentionSide from './MentionSide';
+import StatementScore from './StatementScore';
 
 function Pill({ color, children }) {
   return <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${pillColorClass(color)}`}>{children}</span>;
-}
-
-function Side({ side }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span className="font-medium text-gray-900 dark:text-gray-100">{side?.label ?? '?'}</span>
-      <TypePill type={side?.type} />
-    </span>
-  );
 }
 
 function EditForm({ claim, onSave, onCancel }) {
@@ -54,7 +48,7 @@ function Actions({ claim, busy, onDecide, onEdit }) {
   );
 }
 
-export default function StatementRow({ claim, passages, canEdit, busy, onDecide }) {
+export default function StatementRow({ claim, passages, canEdit, busy, onDecide, onRename }) {
   const [editing, setEditing] = useState(false);
   const save = async (edits) => {
     setEditing(false);
@@ -63,11 +57,11 @@ export default function StatementRow({ claim, passages, canEdit, busy, onDecide 
   return (
     <li className="space-y-2 py-3" aria-label={`${claim.subject?.label} ${predicateLabel(claim.predicate)} ${claim.object?.label}`}>
       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-        <Side side={claim.subject} />
+        <MentionSide side={claim.subject} canEdit={canEdit} onRename={onRename} />
         <span aria-hidden="true">→</span>
         <span className="italic">{predicateLabel(claim.predicate)}{claim.qualifier ? ` (${claim.qualifier})` : ''}</span>
         <span aria-hidden="true">→</span>
-        <Side side={claim.object} />
+        <MentionSide side={claim.object} canEdit={canEdit} onRename={onRename} />
       </div>
       <div className="flex flex-wrap gap-1">
         <Pill color={modalityColor(claim.modality)}>{claim.modality ?? 'stated'}</Pill>
@@ -76,6 +70,7 @@ export default function StatementRow({ claim, passages, canEdit, busy, onDecide 
         {claim.rejectedBy === 'verifier' && <Pill color="red">rejected by the verifier</Pill>}
         {claim.edited && <Pill color="blue">edited</Pill>}
       </div>
+      <StatementScore claim={claim} />
       {(claim.evidence ?? []).map(ev => <EvidenceQuote key={ev.id} evidence={ev} passages={passages} />)}
       {canEdit && (editing
         ? <EditForm claim={claim} onSave={save} onCancel={() => setEditing(false)} />

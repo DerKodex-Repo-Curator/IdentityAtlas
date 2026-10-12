@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../db/connection.js');
 vi.mock('./model.js', () => ({ ask: vi.fn(), modelStatus: vi.fn() }));
 vi.mock('./resolve.js', () => ({ resolveMentions: vi.fn(async () => new Map()) }));
+vi.mock('./mentions.js', () => ({ renamedMentions: vi.fn(async () => new Map()) }));
+vi.mock('./corroboration.js', () => ({ rescoreSource: vi.fn(async () => ({ scored: 1, corroborated: 1, contradicted: 0 })) }));
 vi.mock('./findings.js', () => ({
   ruleFindings: vi.fn(() => [{ kind: 'question', category: 'unresolved-name', text: 'Wie?', related: {}, origin: 'rule' }]),
   modelFindings: vi.fn(() => []),

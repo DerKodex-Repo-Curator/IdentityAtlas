@@ -150,6 +150,8 @@ describe('TranscriptDetail — statements', () => {
     const mark = row.querySelector('mark');
     expect(mark).toHaveTextContent(/^works for Contoso$/);
     expect(mark.closest('blockquote')).toHaveTextContent('§2She also works for Contoso on billing.');
+    expect(screen.getByRole('region', { name: 'High confidence' })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group by' }), 'Topic');
     expect(screen.getByRole('region', { name: 'Topic customers' })).toBeInTheDocument();
   });
 

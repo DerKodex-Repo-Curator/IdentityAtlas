@@ -18,6 +18,29 @@ const fails = async (p, status) => {
   return err;
 };
 
+describe('bulkReviewClaims', () => {
+  it('decides only statements that are still proposed, limited to the ids shown', async () => {
+    const { bulkReviewClaims } = await import('./review.js');
+    query.mockResolvedValueOnce({ rows: [{ id: LINK }, { id: REL }] });
+    const out = await bulkReviewClaims(TARGET, { status: 'accepted', ids: [LINK, REL] }, 'wim');
+    expect(out).toEqual({ status: 'accepted', updated: 2, ids: [LINK, REL] });
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toContain(`"status" = 'proposed'`);
+    expect(sql).toContain(`'bulk', true`);
+    expect([params[0], params[1], params[2], params[4]]).toEqual([TARGET, 'accepted', 'wim', [LINK, REL]]);
+  });
+
+  it('without ids it means every proposed statement of the transcript; input is checked', async () => {
+    const { bulkReviewClaims } = await import('./review.js');
+    query.mockResolvedValueOnce({ rows: [] });
+    await bulkReviewClaims(TARGET, { status: 'rejected' }, 'wim');
+    expect(query.mock.calls[0][1][4]).toBeNull();
+    await fails(bulkReviewClaims('x', { status: 'accepted' }, 'wim'), 400);
+    await fails(bulkReviewClaims(TARGET, { status: 'proposed' }, 'wim'), 400);
+    await fails(bulkReviewClaims(TARGET, { status: 'accepted', ids: ['nope'] }, 'wim'), 400);
+  });
+});
+
 describe('reviewMatch', () => {
   it('only mention links can be decided here', async () => {
     queryOne.mockResolvedValueOnce(null);
