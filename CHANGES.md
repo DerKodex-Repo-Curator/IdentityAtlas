@@ -1,5 +1,10 @@
 ## Changes in this PR
 
+- Added `-WithLLM` to the portable launcher (`Start-IdentityAtlas.ps1`): custom reports can now be described in plain language on a laptop without Docker. The local report model and llama.cpp are downloaded once on first use and checked against a pinned checksum, or taken from files copied into the LLM folder beforehand on a machine without internet access (`-LlmRoot` picks the folder). The model loads on first use and is unloaded after 15 minutes idle; when anything is missing or blocked, the app still starts and reports can be built by hand.
+- Fixed the report generator's startup warm-up never running in the portable build, which made the first question there take minutes longer than it should.
+
+## Changes in this PR
+
 - The Application Access Review is renamed **Entitlement Pivot**. It now works for any context of resources (a logical application, a department, a tag) and for every resource type in it, not only IdentityIQ entitlements.
 - You choose the report's columns: the context's and the resource's own facts (name, type, owner, system, description) plus any attribute their source stored. The picker only offers attributes the contexts you picked actually carry, and shows how many resources carry each one.
 - You choose the rows and filters of the two pivot tables in the Excel download.
