@@ -1367,6 +1367,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ui/entitlement-pivot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Entitlement Pivot and Saved Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ui/custom-reports/" class="md-nav__link">
         
   
@@ -1520,10 +1548,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_10" >
         
           
-          <label class="md-nav__link" for="__nav_4_9" id="__nav_4_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_10" id="__nav_4_10_label" tabindex="0">
             
   
   
@@ -1541,8 +1569,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_9">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3282,6 +3310,28 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#columns-the-reader-picks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns the reader picks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saved-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved views
+      
+    </span>
+  </a>
   
 </li>
       
@@ -5447,6 +5497,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#columns-the-reader-picks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns the reader picks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saved-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved views
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#counting-assignments-at-scale" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5683,7 +5755,7 @@ know renders an explanatory panel rather than breaking the page.</p>
 <tr>
 <td><code>application-access-review</code></td>
 <td><code>list</code></td>
-<td>One row per entitlement of a named logical application, sectioned into <em>requestable, not in a role</em> / <em>not requestable, not in a role</em> / <em>part of a role</em>, with the certification frequency and entitlement owner as stored and the holders split Direct vs Indirect.</td>
+<td><em>Entitlement Pivot</em> (slug kept from its first name, Application Access Review, so links and saved views keep working) — one row per resource of one or more contexts of resources (a logical application, a department, a tag; any resource type), with the business roles that grant it and its holders split Direct vs via a role. The other columns, and the rows and filters of its two pivots, are <strong>fields the reader picks</strong> — see <a href="#columns-the-reader-picks">Columns the reader picks</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -5697,13 +5769,18 @@ description says so.</p>
 not typed: a name can match several entities, and a report parameterised by a typed name silently
 runs over all of them.</p>
 <p>A template says so with one annotation, and nothing else changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nx">applications</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nx">contexts</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s1">'array'</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">title</span><span class="o">:</span><span class="w"> </span><span class="s1">'Logical applications'</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="s1">'x-lookup'</span><span class="o">:</span><span class="w"> </span><span class="s1">'logical-applications'</span><span class="p">,</span><span class="w">        </span><span class="c1">// a source name, not a query</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="s1">'x-lookupPlaceholder'</span><span class="o">:</span><span class="w"> </span><span class="s1">'Search logical applications…'</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">title</span><span class="o">:</span><span class="w"> </span><span class="s1">'Contexts'</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="s1">'x-lookup'</span><span class="o">:</span><span class="w"> </span><span class="s1">'resource-contexts'</span><span class="p">,</span><span class="w">           </span><span class="c1">// a source name, not a query</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="s1">'x-lookupPlaceholder'</span><span class="o">:</span><span class="w"> </span><span class="s1">'Search contexts…'</span><span class="p">,</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">},</span>
 </code></pre></div>
+<p>When the options depend on an earlier choice, the parameter says which with
+<code>'x-lookupDependsOn': ['contexts']</code>. The form hands those values to the picker, the picker sends them
+along as query parameters (<code>?q=…&amp;contexts=a,b</code>), and the route passes every parameter that is not its
+own (<code>q</code>, <code>limit</code>, <code>ids</code>) to the source as <code>params</code> — capped at ten keys of 200 values each. The
+access review's field picker uses this to offer only the attributes the picked contexts carry.</p>
 <p><code>SchemaConfigForm</code> checks <code>x-lookup</code> <strong>before</strong> <code>type</code>, because it says what the value <em>means</em> while
 <code>type</code> only says how it is carried, and renders <code>components/inputs/EntityLookup</code>. The stored value is
 still an array of strings, so a hand-written URL and an older bookmark keep working. Same annotation
@@ -5719,7 +5796,7 @@ style as <code>x-attributeSource</code> in the context-plugin schemas.</p>
 <tbody>
 <tr>
 <td><code>lookups/types.js</code></td>
-<td>the <code>LookupSource</code> contract: <code>name</code>, <code>displayName</code>, <code>search({q, limit})</code>, optional <code>resolve({ids})</code></td>
+<td>the <code>LookupSource</code> contract: <code>name</code>, <code>displayName</code>, <code>search({q, limit, params})</code>, optional <code>resolve({ids, params})</code></td>
 </tr>
 <tr>
 <td><code>lookups/sources/&lt;name&gt;.js</code></td>
@@ -5793,10 +5870,10 @@ gates two.)</p>
 <p>A workbook opens on a <strong>Summary</strong> tab — report name, run line, the declared constant columns as
 label/value pairs, then every notice — followed by a <strong>Data</strong> tab that holds only the table, header on
 row 1. The serializer writes each declared column once, on the Summary tab, and leaves it out of the
-table. So a review pack for <strong>one</strong> application opens with what the application is — name, owner,
-description, CMDB reference, connection type, onboarding sector, abbreviation, manager — instead of
-repeating those eight values down 21,000 rows. A run over <strong>several</strong> applications declares nothing
-constant, because they genuinely vary per row.</p>
+table. So a review pack for <strong>one</strong> context opens with what the context is — whichever of its fields
+and attributes the reader picked (name, owner, a CMDB reference…) — instead of repeating those values
+down 21,000 rows. A run over <strong>several</strong> contexts declares nothing constant, because they genuinely
+vary per row.</p>
 <p><strong>Exception — a column a pivot is built on stays in the table</strong> (and is still stated on the Summary
 tab). A pivot can only read what the table holds, and the owner reads the pivot the same way for one
 application as for many; see <a href="#pivot-tables-in-the-workbook">Pivot tables in the workbook</a>.</p>
@@ -5828,16 +5905,85 @@ application as for many; see <a href="#pivot-tables-in-the-workbook">Pivot table
 <h3 id="pivot-tables-in-the-workbook">Pivot tables in the workbook<a class="headerlink" href="#pivot-tables-in-the-workbook" title="Permanent link">&para;</a></h3>
 <p>A template may declare <code>pivots</code> — each <code>{ name, rows, filters, values }</code> in column keys, values
 summed — and the xlsx download then has one ready-made pivot per declaration, each on its own tab
-after Data. The Application Access Review declares the two its owners used to build by hand:
-<em>Direct assignments</em> (filters: Requestable, Users assigned via a role; rows: Application owner →
-Application → Entitlement owner → Certification frequency → Entitlement) and <em>Assignments via roles</em>
-(filter: Users assigned via a role; rows: Granted by role(s) → Entitlement).</p>
+after Data. The Entitlement Pivot has the two its owners used to build by hand: <em>Direct assignments</em>
+(rows: the picked pivot rows → Entitlement; filters: the picked pivot filters + Users assigned via a
+role) and <em>Assignments via roles</em> (rows: Granted by role(s) → Entitlement; filters: the picked pivot
+filters). Because they depend on the run's parameters, the run returns them — see below.</p>
 <p>ExcelJS 4.4 (the released line) writes no pivot tables, so <code>reports/xlsxPivots.js</code> adds them to the
 zip ExcelJS produced: one pivot cache over the Data table, shared by every pivot and marked
 <code>refreshOnLoad</code> so Excel lays the pivots out from the sheet when the file opens, and one pivot table
 part per tab. The declaration is metadata (<code>reportMetadata</code> carries <code>pivots</code>), so the serializer still
 never asks which report it is writing. Measured in Excel: a 50,000-row workbook has both pivots ready
 about 4 s after opening, and the pivots add ~0.5 s and ~1 MB to the export.</p>
+<h2 id="columns-the-reader-picks">Columns the reader picks<a class="headerlink" href="#columns-the-reader-picks" title="Permanent link">&para;</a></h2>
+<p>A template's <code>columns</code> and <code>pivots</code> are a declaration, but a run may return its own: <code>run()</code> can
+return <code>columns</code> and <code>pivots</code> next to <code>rows</code>, and <code>routes/reports.js</code> then serves those instead (a
+value that is not a list leaves the declaration standing). The screen, the CSV and the workbook all
+read the payload, so they follow the run. The listing (<code>GET /api/reports</code>) still shows the
+declaration, which should describe a run with every parameter left at its default.</p>
+<p>The Entitlement Pivot uses this to name no attribute of any one deployment. Its columns between the
+entitlement and its counts are <strong>field keys</strong> from <code>reports/accessReviewFields.js</code>, the one place a key
+is turned into a heading and a value:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it reads</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>context.name</code> / <code>.type</code> / <code>.description</code> / <code>.owner</code></td>
+<td>the context's own facts</td>
+</tr>
+<tr>
+<td><code>entitlement.type</code> / <code>.system</code> / <code>.description</code> / <code>.owner</code> / <code>.ownerEmail</code> / <code>.eligibleAssignments</code></td>
+<td>the resource's own facts, its owner through the ownership model, its Eligible holders</td>
+</tr>
+<tr>
+<td><code>context.ext.&lt;key&gt;</code></td>
+<td>any scalar the context's source stored in <code>extendedAttributes</code></td>
+</tr>
+<tr>
+<td><code>entitlement.ext.&lt;key&gt;</code></td>
+<td>any scalar the resource's source stored in <code>extendedAttributes</code></td>
+</tr>
+</tbody>
+</table>
+<p>Three parameters take field keys — <code>fields</code> (columns), <code>pivotRows</code>, <code>pivotFilters</code> — each picked
+through the <code>access-review-fields</code> lookup, which offers the built-ins plus the attributes the picked
+contexts and their live resources actually carry, with how many rows carry each. A field used in a
+pivot becomes a column even when it was not picked as one (a pivot can only read the table), and a
+field that is a row of a pivot is left off that pivot's filters (Excel refuses one field on two axes).
+<code>extendedAttributes</code> keys are read in JavaScript from rows already fetched — a key never reaches SQL.
+A picked attribute no row carries is reported in one notice rather than left as a mysterious empty
+column.</p>
+<p>This replaced a version with one customer's catalogue in the code: a <code>requestable</code> flag that split
+the rows into three sections, a certification frequency with its own typo check, and eight catalogue
+columns (CMDB reference, onboarding sector, …) read under every spelling that had been seen. On any
+other deployment those were empty, and a missing <code>requestable</code> silently put every entitlement in the
+"information only" section. Those values are now attributes like any other: pick them.</p>
+<h2 id="saved-views">Saved views<a class="headerlink" href="#saved-views" title="Permanent link">&para;</a></h2>
+<p>A <strong>view</strong> is a built-in report with its parameters filled in and a name, shared across the deployment
+(<code>ReportViews</code>, migration 090; <code>reports/views.js</code>; <code>routes/reportViews.js</code>). It is served through
+<code>registerReportSource</code> as a report named <code>view-&lt;id&gt;</code>, so the Reports page, the report tab, Refresh and
+every download format work for it with no new code. The template a view becomes:</p>
+<ul>
+<li>runs the built-in report with <code>{ ...savedParams, ...runParams }</code>, so the tab can still adjust one
+  run without changing the view;</li>
+<li>carries the built-in report's <code>parametersSchema</code> with the saved values as each property's <code>default</code>,
+  and drops from <code>required</code> whatever the view fills, so its tab opens with its own choices filled in;</li>
+<li>declares <code>source: 'view'</code> and <code>view: { id, reportName, reportDisplayName }</code>, which <code>reportMetadata</code>
+  passes through so the UI can say what it is a view of and offer <em>Edit view</em>.</li>
+</ul>
+<p>On save, only the parameters the report's schema declares are kept, each as text or a list of text
+(capped), and an update can never move a view to another report. A view whose report has been removed
+disappears from the list rather than failing it. Writes need <code>data.write.reports</code>; unlike custom
+reports there is no feature flag, because a view only stores settings for a report everyone already has.</p>
+<p>The <em>Save as view</em> wizard (<code>ui/.../reports/ReportViewWizard.jsx</code>) is report-agnostic too. A template
+groups its parameters into wizard steps with <code>x-step</code> on each property; the Entitlement Pivot declares
+<em>Scope</em>, <em>Columns</em> and <em>Excel pivots</em>. A property without one goes into a <em>Settings</em> step, and the
+last step names the view.</p>
 <h2 id="counting-assignments-at-scale">Counting assignments at scale<a class="headerlink" href="#counting-assignments-at-scale" title="Permanent link">&para;</a></h2>
 <p>A report that counts assignments per resource is the one shape in this framework that can degenerate
 into a whole-table scan, and <code>ResourceAssignments</code> is the largest table in the product — 46 million
