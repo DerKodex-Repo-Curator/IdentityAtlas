@@ -1,5 +1,11 @@
 ## Changes in this PR
 
+- Fixed the report assistant not recognising you as the person asking when "I" is typed in lower case ("groups i'm in", "what do i own") or when access is "assigned to me" / "van mij": these now give a report about your own account instead of one about everybody.
+- The report assistant can now show who owns each group: "all groups with the group owner" lists the owners' names instead of only an owner count.
+- Group, resource, user and person reports can now show the contexts each row is part of (a *Contexts* column) and filter on them ("groups in the Crown Jewels context", "groups in no context"), both in the definition editor and from the *Ask* box.
+
+## Changes in this PR
+
 - Attributes whose name contains a space, dash, dot or accented letter (such as "CMDB Reference" or "Cost-Center") can now be used everywhere other attributes can: as a filter on the Users and Resources lists, as a matrix filter or grouping, and as a column or condition in the report builder. Before, they were stored and shown on the detail page but silently left out of all of these.
 - Added the External ID to the Context entity in the report builder, so a report of logical applications can list the id the source knows each one by.
 
