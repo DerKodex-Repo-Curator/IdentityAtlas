@@ -21,7 +21,7 @@ This document lists all major software components, dependencies, and infrastruct
 
 | Package | Version | Purpose | License |
 |---------|---------|---------|---------|
-| express | ^5.2.1 | Web application framework | MIT |
+| express | ^5.3.0 | Web application framework | MIT |
 | pg | ^8.23.1 | PostgreSQL client | MIT |
 | ajv | ^8.20.0 | JSON Schema validation for crawler configs | MIT |
 | re2 | ^1.27.0 | Safe regex engine (ReDoS protection) | BSD-3-Clause |
