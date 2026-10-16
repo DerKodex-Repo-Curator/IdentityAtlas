@@ -31,7 +31,7 @@ This document lists all major software components, dependencies, and infrastruct
 | Package | Version | Purpose | License |
 |---------|---------|---------|---------|
 | helmet | ^8.3.0 | Security headers middleware | MIT |
-| express-rate-limit | ^8.7.0 | Rate limiting protection | MIT |
+| express-rate-limit | ^8.7.1 | Rate limiting protection | MIT |
 | cors | ^2.8.5 | Cross-Origin Resource Sharing | MIT |
 | jsonwebtoken | ^9.0.2 | JWT token validation | MIT |
 | jwks-rsa | ^4.1.0 | JWKS key retrieval for Entra ID | MIT |
@@ -93,7 +93,7 @@ This document lists all major software components, dependencies, and infrastruct
 | @dnd-kit/modifiers | ^9.0.0 | DnD position modifiers | MIT |
 | @dnd-kit/sortable | ^10.0.0 | Sortable list implementation | MIT |
 | @dnd-kit/utilities | ^3.2.2 | DnD utility functions | MIT |
-| @tanstack/react-virtual | ^3.14.13 | Virtual scrolling for large tables | MIT |
+| @tanstack/react-virtual | ^3.14.15 | Virtual scrolling for large tables | MIT |
 
 ### Data Export
 
