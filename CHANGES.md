@@ -1,5 +1,10 @@
 ## Changes in this PR
 
+- Fixed "Tag all N matching" on the Users and Resources lists also tagging deleted accounts and resources the list was hiding. It now follows the "Include deleted" checkbox, just like the list.
+- Fixed "Tag all N matching" on the Resources list also tagging business roles, which that list does not show.
+
+## Changes in this PR
+
 - Added an "All attributes" checkbox next to the search box on the Users, Identities and Resources lists. When it is ticked, the search also matches phone numbers, CMDB references, HR numbers and every other attribute a source sends, and a "Matched on" column shows where each result was found. The setting is remembered per list.
 - Added a "Find a context" search box to the Contexts page. It searches every level of every tree, opens the context you pick, and with "All attributes" ticked it also finds a logical application by its CMDB reference.
 - The search on the Users list now also finds an account by its employee ID or external ID, and the Resources, Groups and Contexts searches also match the external ID.
