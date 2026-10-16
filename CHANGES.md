@@ -1,5 +1,9 @@
 ## Changes in this PR
 
+- The "Describe it" box in the report builder now says it is checking the model server, and after a few seconds that the model server is starting up and can take a few minutes, instead of showing an empty card while a scaled-down model server starts
+
+## Changes in this PR
+
 - The Excel Power Query workbook now explains the "Information is required about data privacy" prompt Excel raises the first time a query runs, and walks you through the mandatory "Ignore the Privacy Levels" step — on the README sheet and on every query sheet, next to the M code you paste. Previously the prompt appeared with no explanation and the queries returned no data, making the export look broken.
 - Documented the same step in the Excel Power Query export guide, including why the per-workbook setting (never the global one) is the safe choice.
 - The Excel template authoring guide now tells maintainers to save the per-workbook privacy setting into the template, and to verify it survived the save.
