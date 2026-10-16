@@ -5691,7 +5691,7 @@
 </tr>
 <tr>
 <td><code>local/no-native-dialogs</code></td>
-<td>error (allowlisted legacy files: warn)</td>
+<td>error</td>
 <td><code>confirm()</code> / <code>alert()</code> / <code>prompt()</code></td>
 </tr>
 <tr>
@@ -5706,7 +5706,7 @@
 </tr>
 </tbody>
 </table>
-<p><code>no-native-dialogs</code> carries a <strong>shrinking allowlist</strong> of files that still use native dialogs (the pre-existing backlog). As each is migrated to an in-app dialog, remove it from the allowlist — new code is gated immediately.</p>
+<p><strong>Warnings fail CI too.</strong> Both <code>npm run lint</code> scripts (UI and API) run with <code>--max-warnings 0</code>, so a rule set to <code>warn</code> blocks a PR exactly like an <code>error</code> does — there is no "yellow but green" state. A warning gets fixed, or — where a human has checked that the rule is wrong for that line — suppressed with <code>// eslint-disable-next-line &lt;rule&gt; -- &lt;why it is safe&gt;</code>. A suppression that stops matching anything is itself reported, so it can't outlive the code it was written for.</p>
 
 
 
