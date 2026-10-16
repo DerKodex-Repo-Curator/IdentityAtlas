@@ -1,2 +1,0 @@
-- Lint warnings now fail the PR checks, in both the UI and the API, instead of passing silently as yellow notes on the PR
-- Fixed two phrase patterns in the report assistant that slowed down sharply on a question with a long run of spaces
