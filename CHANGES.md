@@ -1,5 +1,16 @@
 ## Changes in this PR
 
+- Added an "All attributes" checkbox next to the search box on the Users, Identities and Resources lists. When it is ticked, the search also matches phone numbers, CMDB references, HR numbers and every other attribute a source sends, and a "Matched on" column shows where each result was found. The setting is remembered per list.
+- Added a "Find a context" search box to the Contexts page. It searches every level of every tree, opens the context you pick, and with "All attributes" ticked it also finds a logical application by its CMDB reference.
+- The search on the Users list now also finds an account by its employee ID or external ID, and the Resources, Groups and Contexts searches also match the external ID.
+- Added an extended search to the Users, Identities, Resources, Groups and Contexts lists that matches every attribute a source sends, such as a CMDB reference on a logical application, an employee number or a phone number. Each result says which field matched.
+- Extended search finds a phone number however it is written: "+31 6 1234 5678", "06-12345678" and "0612345678" find each other.
+- Extended search on Identities also finds a person through their linked accounts, for example by the mobile number on their Entra account.
+- Fixed "Tag all N matching" on the Identities list tagging a different set than the list showed: a search that matched on job title or employee ID was not applied to the bulk tag. Bulk tagging now always uses the same search as the list, including extended search.
+- Searching Contexts now looks at every level, not only the top-level contexts, so a logical application under a catalogue can be found directly.
+
+## Changes in this PR
+
 - Lint warnings now fail the PR checks, in both the UI and the API, instead of passing silently as yellow notes on the PR
 - Fixed two phrase patterns in the report assistant that slowed down sharply on a question with a long run of spaces
 
