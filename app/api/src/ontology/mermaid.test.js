@@ -50,12 +50,12 @@ describe('coreClassDiagram', () => {
 
   it('declares the node classes and their subclasses, not edges or value lists', () => {
     const declared = cd.filter(l => l.startsWith('    class ')).map(l => l.trim().slice(6));
-    expect(declared).toEqual(['Group', 'GroupOwnership', 'OwnershipResource', 'Principal', 'Resource', 'System', 'User']);
+    expect(declared).toEqual(['ControlPermission', 'Group', 'GroupOwnership', 'Permission', 'Person', 'Principal', 'Resource', 'System', 'TechnicalRole', 'User']);
   });
 
   it('draws inheritance but not the abstract Node root', () => {
     const inherits = cd.filter(l => l.includes('<|--')).map(l => l.trim());
-    expect(inherits).toEqual(['Resource <|-- Group', 'OwnershipResource <|-- GroupOwnership', 'Resource <|-- OwnershipResource', 'Principal <|-- User']);
+    expect(inherits).toEqual(['Permission <|-- ControlPermission', 'Resource <|-- Group', 'ControlPermission <|-- GroupOwnership', 'Resource <|-- Permission', 'Principal <|-- Person', 'Resource <|-- TechnicalRole', 'Person <|-- User']);
   });
 
   it('draws each relationship type between its domain and range', () => {

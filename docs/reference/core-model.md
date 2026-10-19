@@ -5,7 +5,7 @@
     Do not edit it by hand: CI fails when it differs from the ontology. How to change the model:
     [Maintaining the Core Ontology](../contributing/maintaining-the-ontology.md).
 
-Ontology `https://identityatlas.io/ontology`, version `1.2.0`. Namespace `https://identityatlas.io/ontology#` (prefix `ia:`).
+Ontology `https://identityatlas.io/ontology`, version `2.0.0`. Namespace `https://identityatlas.io/ontology#` (prefix `ia:`).
 Download the Turtle file for Protégé, a triple store or any RDF/OWL tool: [core.ttl](https://raw.githubusercontent.com/Fortigi/IdentityAtlas/main/ontology/core.ttl).
 
 A column is identified by the property of the same name: `Principals.accountEnabled` is
@@ -20,7 +20,9 @@ in it: [Core Ontology](../architecture/core-ontology.md).
 classDiagram
     direction LR
     class AIAgent
+    class AccessPermission
     class AdministrativeUnitContext
+    class Agent
     class AppRole
     class Application
     class ApplicationOwnership
@@ -35,6 +37,7 @@ classDiagram
     class CRMRole
     class Context
     class ContextRecipeContext
+    class ControlPermission
     class CostCenterContext
     class DelegatedPermission
     class DepartmentContext
@@ -52,8 +55,11 @@ classDiagram
     class ManagerHierarchyContext
     class OrgUnitContext
     class OrganisationalUnitContext
+    class OrganizationalUnit
     class OrphanedAccountsContext
-    class OwnershipResource
+    class Other
+    class Permission
+    class Person
     class Principal
     class PrincipalTypeContext
     class PrincipalTypeRootContext
@@ -67,79 +73,93 @@ classDiagram
     class RiskyAppConsentContext
     class RiskyConsentContext
     class SAPRole
+    class Scope
     class ScopeContext
     class ScopeHierarchyContext
+    class Segment
     class Service
     class ServicePrincipal
     class ServicePrincipalOwnership
     class SharedMailbox
+    class Software
     class System
     class SystemMembershipContext
     class SystemMembershipRootContext
     class TagContext
     class TagGroupContext
     class TeamContext
+    class TechnicalRole
     class UntypedResource
     class User
     class WorkloadIdentity
-    Principal <|-- AIAgent
-    Context <|-- AdministrativeUnitContext
-    Resource <|-- AppRole
+    Agent <|-- AIAgent
+    Permission <|-- AccessPermission
+    OrganizationalUnit <|-- AdministrativeUnitContext
+    Principal <|-- Agent
+    TechnicalRole <|-- AppRole
     Resource <|-- Application
-    OwnershipResource <|-- ApplicationOwnership
-    Resource <|-- ApplicationPermission
-    Resource <|-- AzureManagementGroup
-    Resource <|-- AzureResource
-    Resource <|-- AzureResourceGroup
-    Resource <|-- AzureRoleAssignment
-    Resource <|-- AzureScope
-    Resource <|-- AzureSubscription
+    ControlPermission <|-- ApplicationOwnership
+    AccessPermission <|-- ApplicationPermission
+    Scope <|-- AzureManagementGroup
+    Scope <|-- AzureResource
+    Scope <|-- AzureResourceGroup
+    TechnicalRole <|-- AzureRoleAssignment
+    Scope <|-- AzureScope
+    Scope <|-- AzureSubscription
     Resource <|-- BusinessRole
-    Resource <|-- CRMRole
-    Context <|-- ContextRecipeContext
-    Context <|-- CostCenterContext
-    Resource <|-- DelegatedPermission
-    Context <|-- DepartmentContext
-    Resource <|-- Entitlement
-    Resource <|-- EntraDirectoryRole
-    Context <|-- EntraGroupCategoryContext
-    Context <|-- EntraGroupRootContext
-    Principal <|-- ExternalUser
+    TechnicalRole <|-- CRMRole
+    Segment <|-- ContextRecipeContext
+    Permission <|-- ControlPermission
+    Segment <|-- CostCenterContext
+    AccessPermission <|-- DelegatedPermission
+    OrganizationalUnit <|-- DepartmentContext
+    AccessPermission <|-- Entitlement
+    TechnicalRole <|-- EntraDirectoryRole
+    Segment <|-- EntraGroupCategoryContext
+    Segment <|-- EntraGroupRootContext
+    Person <|-- ExternalUser
     Resource <|-- Group
-    OwnershipResource <|-- GroupOwnership
-    Context <|-- LocationContext
+    ControlPermission <|-- GroupOwnership
+    Segment <|-- LocationContext
     Context <|-- LogicalApplicationContext
-    Principal <|-- ManagedIdentity
-    Context <|-- ManagerHierarchyContext
-    Context <|-- OrgUnitContext
-    Context <|-- OrganisationalUnitContext
-    Context <|-- OrphanedAccountsContext
-    Resource <|-- OwnershipResource
-    Context <|-- PrincipalTypeContext
-    Context <|-- PrincipalTypeRootContext
-    Context <|-- ResourceClusterContext
-    OwnershipResource <|-- ResourceOwnership
-    Context <|-- ResourcePlaneContext
-    Context <|-- ResourceRoleContext
-    Context <|-- ResourceTypeContext
-    Context <|-- ResourceTypeRootContext
-    Context <|-- RiskyAppConsentContext
-    Context <|-- RiskyConsentContext
-    Resource <|-- SAPRole
-    Context <|-- ScopeContext
-    Context <|-- ScopeHierarchyContext
-    Resource <|-- Service
-    Principal <|-- ServicePrincipal
-    OwnershipResource <|-- ServicePrincipalOwnership
-    Principal <|-- SharedMailbox
-    Context <|-- SystemMembershipContext
-    Context <|-- SystemMembershipRootContext
+    Software <|-- ManagedIdentity
+    OrganizationalUnit <|-- ManagerHierarchyContext
+    OrganizationalUnit <|-- OrgUnitContext
+    OrganizationalUnit <|-- OrganisationalUnitContext
+    Context <|-- OrganizationalUnit
+    Segment <|-- OrphanedAccountsContext
+    Resource <|-- Other
+    Resource <|-- Permission
+    Principal <|-- Person
+    Segment <|-- PrincipalTypeContext
+    Segment <|-- PrincipalTypeRootContext
+    Segment <|-- ResourceClusterContext
+    ControlPermission <|-- ResourceOwnership
+    Segment <|-- ResourcePlaneContext
+    Segment <|-- ResourceRoleContext
+    Segment <|-- ResourceTypeContext
+    Segment <|-- ResourceTypeRootContext
+    Segment <|-- RiskyAppConsentContext
+    Segment <|-- RiskyConsentContext
+    TechnicalRole <|-- SAPRole
+    Resource <|-- Scope
+    Segment <|-- ScopeContext
+    Segment <|-- ScopeHierarchyContext
+    Context <|-- Segment
+    Application <|-- Service
+    Software <|-- ServicePrincipal
+    ControlPermission <|-- ServicePrincipalOwnership
+    Person <|-- SharedMailbox
+    Principal <|-- Software
+    Segment <|-- SystemMembershipContext
+    Segment <|-- SystemMembershipRootContext
     Context <|-- TagContext
-    Context <|-- TagGroupContext
-    Context <|-- TeamContext
-    Resource <|-- UntypedResource
-    Principal <|-- User
-    Principal <|-- WorkloadIdentity
+    TagContext <|-- TagGroupContext
+    OrganizationalUnit <|-- TeamContext
+    Resource <|-- TechnicalRole
+    AccessPermission <|-- UntypedResource
+    Person <|-- User
+    Software <|-- WorkloadIdentity
     Resource --> Resource : Contains
     Application --> DelegatedPermission : DelegatesScope
     Resource --> Resource : GrantsAccessTo
@@ -166,36 +186,36 @@ Identifier: `id` (uuid) — the instance IRI, not a property.
 
 `contextType` is an open vocabulary — any value is accepted. These are the values Identity Atlas itself relies on:
 
-| Value | Class | Groups | Made by | Meaning |
-|---|---|---|---|---|
-| `AdministrativeUnit` | `ia:AdministrativeUnitContext` | Principal | crawler `demo` | An Entra administrative unit. Only the demo dataset emits it; the Entra crawler does not sync administrative units. |
-| `ContextRecipe` | `ia:ContextRecipeContext` | Resource | plugin `context-recipe` | Resources matched by a recipe built in the context assistant, plus the ones pinned by hand. |
-| `CostCenter` | `ia:CostCenterContext` | Identity | crawler `omada` | A cost center synced from Omada, grouping persons. |
-| `Department` | `ia:DepartmentContext` | Identity, Principal | plugin `department-from-principal`; crawlers `demo`, `omada` | One flat context per distinct Principals.department value (externalId 'dept:<value>'), without hierarchy. The Omada crawler syncs departments of persons under the same value, and the demo dataset writes a department tree of accounts. |
-| `EntraGroupCategory` | `ia:EntraGroupCategoryContext` | Resource | plugin `entra-group-category-tree` | The Entra groups of one category (security, Microsoft 365, dynamic …). |
-| `EntraGroupRoot` | `ia:EntraGroupRootContext` | Resource | plugin `entra-group-category-tree` | Root of the tree that groups Entra groups by category. |
-| `Location` | `ia:LocationContext` | Identity | crawler `omada` | A work location synced from Omada, grouping persons. |
-| `LogicalApplication` | `ia:LogicalApplicationContext` | Resource | crawler `mssql` | An application as the business knows it, grouping the technical resources (entitlements, roles, groups) that belong to it. The SQL connector's IdentityIQ preset loads these from the application list. |
-| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Principal | plugin `manager-hierarchy` | One generated context per manager of one system's accounts, plus a synthetic root (externalId 'root'). The manager is recorded only in externalId, which holds the manager's Principal id — there is no manager column or member role. Members are the manager's direct reports (Principals.managerId, overridden per account by ManagerHierarchyOverrides); the manager is a member of their own manager's node, not of their own. parentContextId is the node of the manager's own manager, else the root. Accounts with no manager that manage nobody are members of the root; a top-level manager is a member of no node. A managerId that points at no account of the system still becomes a node, named 'Unknown'. A reporting cycle, a self-reference included, leaves a node without a parent: the runner refuses the link that would close the cycle. |
-| `OrgUnit` | `ia:OrgUnitContext` | Identity | crawlers `csv`, `midpoint`, `omada` | An organisational unit synced from an IGA or HR source, grouping persons; nested like the source's org tree. The default context type of the Omada, CSV and midPoint crawlers. Not the same value as the OrganisationalUnit the ad-ou-from-dn plugin derives from accounts. |
-| `OrganisationalUnit` | `ia:OrganisationalUnitContext` | Principal | plugin `ad-ou-from-dn` | An Active Directory OU derived from the accounts' distinguished names, nested like the directory. Crawlers that sync org units (Omada, CSV, midPoint) store 'OrgUnit' instead — a different value the ontology does not define. |
-| `OrphanedAccounts` | `ia:OrphanedAccountsContext` | Principal | plugin `orphaned-accounts` | Accounts that are not linked to any identity. |
-| `PrincipalType` | `ia:PrincipalTypeContext` | Principal | plugin `principal-type-tree` | The accounts of one principalType. |
-| `PrincipalTypeRoot` | `ia:PrincipalTypeRootContext` | Principal | plugin `principal-type-tree` | Root of the tree that groups accounts by principalType. |
-| `ResourceCluster` | `ia:ResourceClusterContext` | Resource | plugin `resource-cluster` | Resources whose names cluster together. |
-| `ResourcePlane` | `ia:ResourcePlaneContext` | Resource | plugin `resource-type-tree` | Control or data plane below a resource type group. |
-| `ResourceRole` | `ia:ResourceRoleContext` | Resource | plugin `resource-type-tree` | One role name below a resource plane. |
-| `ResourceType` | `ia:ResourceTypeContext` | Resource | plugin `resource-type-tree` | The resources of one resourceType. |
-| `ResourceTypeRoot` | `ia:ResourceTypeRootContext` | Resource | plugin `resource-type-tree` | Root of the tree that groups resources by resourceType. |
-| `RiskyAppConsent` | `ia:RiskyAppConsentContext` | Resource | plugin `risky-consent` | Applications flagged as malicious (threat feed) or suspicious (heuristics). |
-| `RiskyConsent` | `ia:RiskyConsentContext` | Resource | plugin `risky-consent` | Granted permissions of one risk tier (High, Medium, Low). |
-| `Scope` | `ia:ScopeContext` | Resource | plugin `scope-hierarchy` | A scope-hierarchy node whose resource has no resourceType. |
-| `ScopeHierarchy` | `ia:ScopeHierarchyContext` | Resource | plugin `scope-hierarchy` | Root of a tree that follows the Contains hierarchy of scope resources (Azure management groups, subscriptions, resource groups). Its nodes are typed after the resource each stands for, so below the root contextType repeats a resourceType value. |
-| `SystemMembership` | `ia:SystemMembershipContext` | Principal, Resource | plugin `system-membership-principals`, `system-membership-resources` | The accounts, or the resources, loaded from one system. |
-| `SystemMembershipRoot` | `ia:SystemMembershipRootContext` | Principal, Resource | plugin `system-membership-principals`, `system-membership-resources` | Root of a tree with one context per connected system. Two plugins emit it, one for accounts and one for resources; each tree holds one kind. |
-| `Tag` | `ia:TagContext` | Identity, Principal, Resource | application code | A manual label (variant 'manual') that the tags API reads and writes, placed under the TagGroup root of its targetType. |
-| `TagGroup` | `ia:TagGroupContext` | Identity, Principal, Resource | application code | The synthetic 'Tags' root, one per targetType, created at startup so the tags of one kind share a tree. |
-| `Team` | `ia:TeamContext` | Principal | crawler `demo` | A team below a department. Only the demo dataset emits it. |
+| Value | Class | Template | Groups | Made by | Meaning |
+|---|---|---|---|---|---|
+| `AdministrativeUnit` | `ia:AdministrativeUnitContext` | Organizational unit | Principal | crawler `demo` | An Entra administrative unit. Only the demo dataset emits it; the Entra crawler does not sync administrative units. |
+| `ContextRecipe` | `ia:ContextRecipeContext` | Segment | Resource | plugin `context-recipe` | Resources matched by a recipe built in the context assistant, plus the ones pinned by hand. |
+| `CostCenter` | `ia:CostCenterContext` | Segment | Identity | crawler `omada` | A cost center synced from Omada, grouping persons. |
+| `Department` | `ia:DepartmentContext` | Organizational unit | Identity, Principal | plugin `department-from-principal`; crawlers `demo`, `omada` | One flat context per distinct Principals.department value (externalId 'dept:<value>'), without hierarchy. The Omada crawler syncs departments of persons under the same value, and the demo dataset writes a department tree of accounts. |
+| `EntraGroupCategory` | `ia:EntraGroupCategoryContext` | Segment | Resource | plugin `entra-group-category-tree` | The Entra groups of one category (security, Microsoft 365, dynamic …). |
+| `EntraGroupRoot` | `ia:EntraGroupRootContext` | Segment | Resource | plugin `entra-group-category-tree` | Root of the tree that groups Entra groups by category. |
+| `Location` | `ia:LocationContext` | Segment | Identity | crawler `omada` | A work location synced from Omada, grouping persons. |
+| `LogicalApplication` | `ia:LogicalApplicationContext` | Logical application | Resource | crawler `mssql` | An application as the business knows it, grouping the technical resources (entitlements, roles, groups) that belong to it. The SQL connector's IdentityIQ preset loads these from the application list. |
+| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Organizational unit | Principal | plugin `manager-hierarchy` | One generated context per manager of one system's accounts, plus a synthetic root (externalId 'root'). The manager is recorded only in externalId, which holds the manager's Principal id — there is no manager column or member role. Members are the manager's direct reports (Principals.managerId, overridden per account by ManagerHierarchyOverrides); the manager is a member of their own manager's node, not of their own. parentContextId is the node of the manager's own manager, else the root. Accounts with no manager that manage nobody are members of the root; a top-level manager is a member of no node. A managerId that points at no account of the system still becomes a node, named 'Unknown'. A reporting cycle, a self-reference included, leaves a node without a parent: the runner refuses the link that would close the cycle. |
+| `OrgUnit` | `ia:OrgUnitContext` | Organizational unit | Identity | crawlers `csv`, `midpoint`, `omada` | An organisational unit synced from an IGA or HR source, grouping persons; nested like the source's org tree. The default context type of the Omada, CSV and midPoint crawlers. Not the same value as the OrganisationalUnit the ad-ou-from-dn plugin derives from accounts. |
+| `OrganisationalUnit` | `ia:OrganisationalUnitContext` | Organizational unit | Principal | plugin `ad-ou-from-dn` | An Active Directory OU derived from the accounts' distinguished names, nested like the directory. Crawlers that sync org units (Omada, CSV, midPoint) store 'OrgUnit' instead — a different value the ontology does not define. |
+| `OrphanedAccounts` | `ia:OrphanedAccountsContext` | Segment | Principal | plugin `orphaned-accounts` | Accounts that are not linked to any identity. |
+| `PrincipalType` | `ia:PrincipalTypeContext` | Segment | Principal | plugin `principal-type-tree` | The accounts of one principalType. |
+| `PrincipalTypeRoot` | `ia:PrincipalTypeRootContext` | Segment | Principal | plugin `principal-type-tree` | Root of the tree that groups accounts by principalType. |
+| `ResourceCluster` | `ia:ResourceClusterContext` | Segment | Resource | plugin `resource-cluster` | Resources whose names cluster together. |
+| `ResourcePlane` | `ia:ResourcePlaneContext` | Segment | Resource | plugin `resource-type-tree` | Control or data plane below a resource type group. |
+| `ResourceRole` | `ia:ResourceRoleContext` | Segment | Resource | plugin `resource-type-tree` | One role name below a resource plane. |
+| `ResourceType` | `ia:ResourceTypeContext` | Segment | Resource | plugin `resource-type-tree` | The resources of one resourceType. |
+| `ResourceTypeRoot` | `ia:ResourceTypeRootContext` | Segment | Resource | plugin `resource-type-tree` | Root of the tree that groups resources by resourceType. |
+| `RiskyAppConsent` | `ia:RiskyAppConsentContext` | Segment | Resource | plugin `risky-consent` | Applications flagged as malicious (threat feed) or suspicious (heuristics). |
+| `RiskyConsent` | `ia:RiskyConsentContext` | Segment | Resource | plugin `risky-consent` | Granted permissions of one risk tier (High, Medium, Low). |
+| `Scope` | `ia:ScopeContext` | Segment | Resource | plugin `scope-hierarchy` | A scope-hierarchy node whose resource has no resourceType. |
+| `ScopeHierarchy` | `ia:ScopeHierarchyContext` | Segment | Resource | plugin `scope-hierarchy` | Root of a tree that follows the Contains hierarchy of scope resources (Azure management groups, subscriptions, resource groups). Its nodes are typed after the resource each stands for, so below the root contextType repeats a resourceType value. |
+| `SystemMembership` | `ia:SystemMembershipContext` | Segment | Principal, Resource | plugin `system-membership-principals`, `system-membership-resources` | The accounts, or the resources, loaded from one system. |
+| `SystemMembershipRoot` | `ia:SystemMembershipRootContext` | Segment | Principal, Resource | plugin `system-membership-principals`, `system-membership-resources` | Root of a tree with one context per connected system. Two plugins emit it, one for accounts and one for resources; each tree holds one kind. |
+| `Tag` | `ia:TagContext` | Tag | Identity, Principal, Resource | application code | A manual label (variant 'manual') that the tags API reads and writes, placed under the TagGroup root of its targetType. |
+| `TagGroup` | `ia:TagGroupContext` | Tag | Identity, Principal, Resource | application code | The synthetic 'Tags' root, one per targetType, created at startup so the tags of one kind share a tree. |
+| `Team` | `ia:TeamContext` | Organizational unit | Principal | crawler `demo` | A team below a department. Only the demo dataset emits it. |
 
 Other values arrive from the source data or configuration of: `csv`, `custom-connector`, `midpoint`, `mssql`, `omada`.
 
@@ -273,15 +293,15 @@ Identifier: `id` (uuid) — the instance IRI, not a property.
 
 `principalType` accepts exactly these values:
 
-| Value | Class | Made by | Meaning |
-|---|---|---|---|
-| `AIAgent` | `ia:AIAgent` | crawlers `demo`, `entra-id` | An AI agent (Copilot Studio, Azure OpenAI, a custom bot) that holds access as its own account. |
-| `ExternalUser` | `ia:ExternalUser` | crawlers `demo`, `omada` | A guest / B2B account from another organisation. |
-| `ManagedIdentity` | `ia:ManagedIdentity` | crawlers `demo`, `entra-id` | A system- or user-assigned identity attached to a cloud resource. |
-| `ServicePrincipal` | `ia:ServicePrincipal` | crawlers `demo`, `entra-id`, `omada` | The service principal of an application registration. |
-| `SharedMailbox` | `ia:SharedMailbox` | crawler `demo` | A shared, room or equipment mailbox account. Accepted from CSV, SQL, SCIM and midPoint sources; of the built-in sources only the demo dataset writes it. |
-| `User` | `ia:User` | crawlers `azure-rm`, `csv`, `demo`, `entra-id`, `midpoint`, `mssql`, `omada`, `scim` | An interactive human user account. |
-| `WorkloadIdentity` | `ia:WorkloadIdentity` | no built-in source | A federated-credential identity used by a workload (a pipeline, a Kubernetes service account). Accepted from CSV, SQL, SCIM and midPoint sources; the Entra crawler deliberately does not classify accounts this way. |
+| Value | Class | Template | Made by | Meaning |
+|---|---|---|---|---|
+| `AIAgent` | `ia:AIAgent` | Agent | crawlers `demo`, `entra-id` | An AI agent (Copilot Studio, Azure OpenAI, a custom bot) that holds access as its own account. |
+| `ExternalUser` | `ia:ExternalUser` | Person | crawlers `demo`, `omada` | A guest / B2B account from another organisation. |
+| `ManagedIdentity` | `ia:ManagedIdentity` | Software | crawlers `demo`, `entra-id` | A system- or user-assigned identity attached to a cloud resource. |
+| `ServicePrincipal` | `ia:ServicePrincipal` | Software | crawlers `demo`, `entra-id`, `omada` | The service principal of an application registration. |
+| `SharedMailbox` | `ia:SharedMailbox` | Person | crawler `demo` | A shared, room or equipment mailbox account. Accepted from CSV, SQL, SCIM and midPoint sources; of the built-in sources only the demo dataset writes it. |
+| `User` | `ia:User` | Person | crawlers `azure-rm`, `csv`, `demo`, `entra-id`, `midpoint`, `mssql`, `omada`, `scim` | An interactive human user account. |
+| `WorkloadIdentity` | `ia:WorkloadIdentity` | Software | no built-in source | A federated-credential identity used by a workload (a pipeline, a Kubernetes service account). Accepted from CSV, SQL, SCIM and midPoint sources; the Entra crawler deliberately does not classify accounts this way. |
 
 Mapped onto this list from the source data or configuration by: `csv`, `custom-connector`, `midpoint`, `mssql`, `omada`, `scim`.
 
@@ -320,30 +340,30 @@ Identifier: `id` (uuid) — the instance IRI, not a property.
 
 `resourceType` is an open vocabulary — any value is accepted. These are the values Identity Atlas itself relies on:
 
-| Value | Class | Made by | Meaning |
-|---|---|---|---|
-| `AppRole` | `ia:AppRole` | crawlers `demo`, `entra-id` | One app role of an application (one resource per application + appRoleId). |
-| `Application` | `ia:Application` | crawlers `demo`, `entra-id` | An enterprise application (service principal) as a resource. Grants nothing by itself; parent of its app roles and permissions. |
-| `ApplicationOwnership` | `ia:ApplicationOwnership` | crawlers `demo`, `entra-id` | (ia:OwnershipResource) The owners of an app registration — they can add a credential and act as the app. |
-| `ApplicationPermission` | `ia:ApplicationPermission` | crawler `entra-id` | One app-only (admin-consented) permission a service principal holds on another API. |
-| `AzureManagementGroup` | `ia:AzureManagementGroup` | crawler `azure-rm` | An Azure management group; Contains the management groups and subscriptions below it. |
-| `AzureResource` | `ia:AzureResource` | crawlers `azure-rm`, `demo` | One Azure resource. Its ARM type (Microsoft.Compute/virtualMachines …) is in extendedAttributes.azureResourceType, not in resourceType. |
-| `AzureResourceGroup` | `ia:AzureResourceGroup` | crawlers `azure-rm`, `demo` | An Azure resource group; Contains its resources. |
-| `AzureRoleAssignment` | `ia:AzureRoleAssignment` | crawlers `azure-rm`, `demo` | One Azure RBAC role at one scope (role definition + scope); holders have it Direct, or Indirect through a group or an inherited scope. |
-| `AzureScope` | `ia:AzureScope` | crawlers `azure-rm`, `demo` | The tenant root scope ('/') of Azure Resource Manager, above every management group. |
-| `AzureSubscription` | `ia:AzureSubscription` | crawler `azure-rm` | An Azure subscription; Contains its resource groups. |
-| `BusinessRole` | `ia:BusinessRole` | crawlers `csv`, `demo`, `entra-id`, `midpoint`, `mssql`, `omada` | A governance construct (Entra access package, Omada / midPoint business role). Contains the resources it grants; hidden from the matrix by default. |
-| `CRMRole` | `ia:CRMRole` | crawler `demo` | A role in a CRM system. Only the demo dataset emits it. |
-| `DelegatedPermission` | `ia:DelegatedPermission` | crawlers `demo`, `entra-id` | One OAuth2 delegated scope granted to a client application on an API (one resource per client, API and scope). |
-| `Entitlement` | `ia:Entitlement` | crawlers `midpoint`, `mssql` | A permission in a target application, as an IGA system records it (a midPoint entitlement shadow, an IdentityIQ entitlement). |
-| `EntraDirectoryRole` | `ia:EntraDirectoryRole` | crawlers `demo`, `entra-id` | One Entra directory role (id = roleDefinitionId); extendedAttributes holds its allowedResourceActions. |
-| `Group` | `ia:Group` | crawlers `demo`, `entra-id`, `scim` | A security or Microsoft 365 group. The effective-access engine expands membership through it. |
-| `GroupOwnership` | `ia:GroupOwnership` | crawlers `demo`, `entra-id` | (ia:OwnershipResource) The owners of an Entra group. |
-| `Resource` | `ia:UntypedResource` | crawler `omada` | A resource the source does not classify further. Omada's default for permissions; the source's own type is in extendedAttributes.resourceType. |
-| `ResourceOwnership` | `ia:ResourceOwnership` | crawler `mssql` | (ia:OwnershipResource) The owners of a resource loaded by the SQL connector; the owned resource's own type is in extendedAttributes.ownedResourceType. |
-| `SAPRole` | `ia:SAPRole` | crawler `demo` | An SAP role. Only the demo dataset emits it; a real SAP source would arrive through CSV or SQL with a value of its own choosing. |
-| `Service` | `ia:Service` | crawler `midpoint` | A service (an application or system) as midPoint models it. |
-| `ServicePrincipalOwnership` | `ia:ServicePrincipalOwnership` | crawlers `demo`, `entra-id` | (ia:OwnershipResource) The owners of an enterprise application's service principal. |
+| Value | Class | Template | Made by | Meaning |
+|---|---|---|---|---|
+| `AppRole` | `ia:AppRole` | Technical role | crawlers `demo`, `entra-id` | One app role of an application (one resource per application + appRoleId). |
+| `Application` | `ia:Application` | Application | crawlers `demo`, `entra-id` | An enterprise application (service principal) as a resource. Grants nothing by itself; parent of its app roles and permissions. |
+| `ApplicationOwnership` | `ia:ApplicationOwnership` | Permission | crawlers `demo`, `entra-id` | The owners of an app registration — they can add a credential and act as the app. |
+| `ApplicationPermission` | `ia:ApplicationPermission` | Permission | crawler `entra-id` | One app-only (admin-consented) permission a service principal holds on another API. |
+| `AzureManagementGroup` | `ia:AzureManagementGroup` | Scope | crawler `azure-rm` | An Azure management group; Contains the management groups and subscriptions below it. |
+| `AzureResource` | `ia:AzureResource` | Scope | crawlers `azure-rm`, `demo` | One Azure resource. Its ARM type (Microsoft.Compute/virtualMachines …) is in extendedAttributes.azureResourceType, not in resourceType. |
+| `AzureResourceGroup` | `ia:AzureResourceGroup` | Scope | crawlers `azure-rm`, `demo` | An Azure resource group; Contains its resources. |
+| `AzureRoleAssignment` | `ia:AzureRoleAssignment` | Technical role | crawlers `azure-rm`, `demo` | One Azure RBAC role at one scope (role definition + scope); holders have it Direct, or Indirect through a group or an inherited scope. |
+| `AzureScope` | `ia:AzureScope` | Scope | crawlers `azure-rm`, `demo` | The tenant root scope ('/') of Azure Resource Manager, above every management group. |
+| `AzureSubscription` | `ia:AzureSubscription` | Scope | crawler `azure-rm` | An Azure subscription; Contains its resource groups. |
+| `BusinessRole` | `ia:BusinessRole` | Business role | crawlers `csv`, `demo`, `entra-id`, `midpoint`, `mssql`, `omada` | A governance construct (Entra access package, Omada / midPoint business role). Contains the resources it grants; hidden from the matrix by default. |
+| `CRMRole` | `ia:CRMRole` | Technical role | crawler `demo` | A role in a CRM system. Only the demo dataset emits it. |
+| `DelegatedPermission` | `ia:DelegatedPermission` | Permission | crawlers `demo`, `entra-id` | One OAuth2 delegated scope granted to a client application on an API (one resource per client, API and scope). |
+| `Entitlement` | `ia:Entitlement` | Permission | crawlers `midpoint`, `mssql` | A permission in a target application, as an IGA system records it (a midPoint entitlement shadow, an IdentityIQ entitlement). |
+| `EntraDirectoryRole` | `ia:EntraDirectoryRole` | Technical role | crawlers `demo`, `entra-id` | One Entra directory role (id = roleDefinitionId); extendedAttributes holds its allowedResourceActions. |
+| `Group` | `ia:Group` | Group | crawlers `demo`, `entra-id`, `scim` | A security or Microsoft 365 group. The effective-access engine expands membership through it. |
+| `GroupOwnership` | `ia:GroupOwnership` | Permission | crawlers `demo`, `entra-id` | The owners of an Entra group. |
+| `Resource` | `ia:UntypedResource` | Permission | crawler `omada` | A resource the source does not classify further. Omada's default for permissions; the source's own type is in extendedAttributes.resourceType. |
+| `ResourceOwnership` | `ia:ResourceOwnership` | Permission | crawler `mssql` | The owners of a resource loaded by the SQL connector; the owned resource's own type is in extendedAttributes.ownedResourceType. |
+| `SAPRole` | `ia:SAPRole` | Technical role | crawler `demo` | An SAP role. Only the demo dataset emits it; a real SAP source would arrive through CSV or SQL with a value of its own choosing. |
+| `Service` | `ia:Service` | Application | crawler `midpoint` | A service (an application or system) as midPoint models it. |
+| `ServicePrincipalOwnership` | `ia:ServicePrincipalOwnership` | Permission | crawlers `demo`, `entra-id` | The owners of an enterprise application's service principal. |
 
 Other values arrive from the source data or configuration of: `csv`, `custom-connector`, `midpoint`, `mssql`, `omada`.
 

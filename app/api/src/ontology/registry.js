@@ -27,6 +27,9 @@ import { _crawlerManifests } from '../crawlerManifests.js';
  *   contexts          — what each context-algorithm plugin emits (name,
  *                       targetType, contextTypes), and the contextType values
  *                       the rest of the code compares against, with where
+ *   access            — what holding a resource reaches: the types the
+ *                       effective-access engine expands, and the ones that
+ *                       never count as access (ownership)
  *   crawlers          — what each crawler manifest declares it writes
  *                       (crawler.json `emits`: fixed types per field, and the
  *                       fields it passes free values through for)
@@ -54,6 +57,7 @@ export function loadRegistry() {
       plugins: REGISTERED_PLUGINS.map(p => ({ name: p.name, targetType: p.targetType, contextTypes: p.contextTypes })),
       branchedOn: scanContextTypeUsage(),
     },
+    access: { expands: GROUP_RESOURCE_TYPES, never: OWNERSHIP_RESOURCE_TYPES },
     crawlers: Object.values(_crawlerManifests).map(m => ({ type: m.type, emits: m.emits })),
   };
 }

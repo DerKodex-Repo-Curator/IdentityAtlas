@@ -115,6 +115,17 @@ describe('against a scratch copy of the repository files', () => {
     });
   });
 
+  it('check fails on the real ontology when a type loses its template', () => {
+    runGenerate({ root });
+    const ttl = readFileSync(join(root, PATHS.ontology), 'utf8');
+    const marker = 'ia:template true ; ia:expandsAccess true ;';
+    expect(ttl).toContain(marker);
+    writeFileSync(join(root, PATHS.ontology), ttl.replace(marker, 'ia:expandsAccess true ;'));
+    // The reference page goes stale too (Group's template column changed); the template finding is the one under test.
+    const errors = runCheck({ root }).errors.map(e => `${e.code} ${e.subject}`);
+    expect(errors.filter(e => !e.startsWith('reference-stale'))).toEqual(['template-missing ia:Group']);
+  });
+
   it('generate fails on a region with no generator', () => {
     writeFileSync(join(root, 'docs', 'other.md'), ['<!-- BEGIN GENERATED: ontology nope -->', '<!-- END GENERATED: ontology nope -->'].join('\n'));
     const { io, out } = capture();

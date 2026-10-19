@@ -34,20 +34,20 @@ describe('typeOrigin / originText', () => {
 });
 
 describe('typeDiagram', () => {
-  it('draws a closed list grouped by origin, in rows, without an "any other value" node', () => {
+  it('draws a closed list grouped by template, sources as subtitle, without an "any other value" node', () => {
     expect(typeDiagram(model, 'Principal')).toBe([
       'flowchart LR',
       '    root["Principal<br/><small>principalType</small>"]:::Principal',
-      '    subgraph g_crawler["Written by a crawler"]',
+      '    subgraph g_Person["Person"]',
       '      direction LR',
       '      t_User["User<br/><small>hr, idp</small>"]:::Principal',
       '    end',
-      '    subgraph g_accepted["Accepted, no built-in source"]',
+      '    subgraph g__none["No template"]',
       '      direction LR',
       '      t_Robot["Robot"]:::Principal',
       '    end',
-      '    root --> g_crawler',
-      '    root --> g_accepted',
+      '    root --> g_Person',
+      '    root --> g__none',
       '    classDef Principal fill:#2563eb,stroke:#1e40af,color:#fff',
     ].join('\n'));
   });
@@ -59,12 +59,15 @@ describe('typeDiagram', () => {
   });
 
   it('says only "any other value" for an open list nobody passes through, and links rows of four', () => {
-    const many = ['A', 'B', 'C', 'D', 'E'].map(v => `ia:${v}Context a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "${v}" ; ia:allowedTargetType ia:EntityKind_Principal .`).join('\n');
-    const out = typeDiagram(modelOf(`${TTL}\n${many}`), 'Context');
+    const segment = 'ia:Segment a owl:Class ; rdfs:subClassOf ia:Context ; ia:template true ; rdfs:label "Segment" .';
+    const many = ['A', 'B', 'C', 'D', 'E'].map(v => `ia:${v}Context a owl:Class ; rdfs:subClassOf ia:Segment ; ia:typeValue "${v}" ; ia:allowedTargetType ia:EntityKind_Principal .`).join('\n');
+    const out = typeDiagram(modelOf(`${TTL}\n${segment}\n${many}`), 'Context');
     expect(out).toContain('    other["any other value"]');
+    expect(out).toContain('    subgraph g_Segment["Segment"]');
     expect(out).toContain('      t_A ~~~ t_B ~~~ t_C ~~~ t_D');
-    expect(out).toContain('      t_E ~~~ t_Tag');
-    expect(out).toContain('    subgraph g_code["Created by the application"]');
+    // The fifth sits alone on its row: no invisible link for a row of one.
+    expect(out).not.toContain('t_E ~~~');
+    expect(out).toContain('    subgraph g_TagContext["Tag"]');
   });
 
   it('leaves a root without a known colour unstyled', () => {
@@ -82,8 +85,8 @@ describe('renderReference — origins', () => {
   const md = renderReference(model);
 
   it('adds a Made by column where crawlers write the types', () => {
-    expect(md).toContain('| Value | Class | Made by | Meaning |');
-    expect(md).toContain('| `User` | `ia:User` | crawlers `hr`, `idp` | A person account. |');
+    expect(md).toContain('| Value | Class | Template | Made by | Meaning |');
+    expect(md).toContain('| `User` | `ia:User` | Person | crawlers `hr`, `idp` | A person account. |');
   });
 
   it('says which crawlers pass values through to an open list, and which map onto a closed one', () => {

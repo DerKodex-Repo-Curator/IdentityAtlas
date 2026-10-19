@@ -23,6 +23,7 @@ const ia = (name) => `${IA}${name}`;
 // Annotations that must carry at most one value per term. Two different values
 // (two labels, two typeValues) is a conflicting definition — check 6.
 export const SINGLE_VALUED = [
+  ia('expandsAccess'), ia('accountabilityDefault'),
   P.label, P.comment, ia('typeValue'), ia('sqlType'), ia('table'), ia('identifierColumn'),
   ia('identifierSqlType'), ia('discriminator'), ia('typeColumn'), ia('storedIn'), ia('valueScheme'), ia('denotesClass'), ia('status'),
 ];
@@ -89,6 +90,9 @@ function buildClass(store, iri) {
     producedBy: values(store, iri, ia('producedBy')).sort(),
     allowedTargetTypes: locals(values(store, iri, ia('allowedTargetType'))).sort(),
     emittedBy: values(store, iri, ia('emittedBy')).sort(),
+    template: flag(store, iri, ia('template')),
+    expandsAccess: first(store, iri, ia('expandsAccess')),
+    accountabilityDefault: localName(first(store, iri, ia('accountabilityDefault')) ?? '') ?? undefined,
     passthroughFrom: values(store, iri, ia('passthroughFrom')).sort(),
   };
 }

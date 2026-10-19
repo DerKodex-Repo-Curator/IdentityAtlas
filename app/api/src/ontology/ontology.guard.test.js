@@ -30,6 +30,7 @@ describe('core ontology (repository)', () => {
     expect(r.ingest.principals.fields.principalType.enum).toBe(PRINCIPAL_TYPES);
     expect(r.ingest['resource-assignments'].fields.assignmentType.enum).toBe(ASSIGNMENT_TYPES);
     expect(r.ownership.resourceTypes).toBe(OWNERSHIP_RESOURCE_TYPES);
+    expect(r.access.never).toBe(OWNERSHIP_RESOURCE_TYPES);
   });
 
   it('classifies every erDiagram / classDiagram in the docs', () => {

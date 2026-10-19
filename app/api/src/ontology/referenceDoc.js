@@ -7,6 +7,7 @@ import {
   columnsOf, isSubClassOf, relationshipTypesOf, schemeMembers, tableClasses, typedSubclasses, valueSetFor,
 } from './model.js';
 import { originText } from './typeOrigins.js';
+import { templateOf } from './typeOrigins.js';
 
 const TTL_URL = 'https://github.com/Fortigi/IdentityAtlas/blob/main/ontology/core.ttl';
 const RAW_URL = 'https://raw.githubusercontent.com/Fortigi/IdentityAtlas/main/ontology/core.ttl';
@@ -50,10 +51,7 @@ function subclassSection(model, cls) {
   const kind = cls.openVocabulary
     ? `${code(cls.discriminator)} is an open vocabulary — any value is accepted. These are the values Identity Atlas itself relies on:`
     : `${code(cls.discriminator)} accepts exactly these values:`;
-  const rows = subs.map(s => {
-    const parents = s.superClasses.filter(x => x !== cls.local).map(x => `ia:${x}`).join(', ');
-    return [code(s.typeValue), code(`ia:${s.local}`), `${parents ? `(${parents}) ` : ''}${s.comment}`];
-  });
+  const rows = subs.map(s => [code(s.typeValue), code(`ia:${s.local}`), templateOf(model, s)?.label ?? '—', s.comment]);
   const from = cls.passthroughFrom.map(code).join(', ');
   let passthrough = [];
   if (from && cls.openVocabulary) passthrough = [`Other values arrive from the source data or configuration of: ${from}.`, ''];
@@ -62,14 +60,14 @@ function subclassSection(model, cls) {
   // Context types also say what they group.
   if (subs.some(s => s.allowedTargetTypes.length)) {
     const groups = (s) => s.allowedTargetTypes.map(i => model.individuals.get(i)?.typeValue ?? i).join(', ');
-    const wide = rows.map(([v, c, m], i) => [v, c, groups(subs[i]), madeBy(subs[i]), m]);
-    return [kind, '', ...table(['Value', 'Class', 'Groups', 'Made by', 'Meaning'], wide), ...passthrough];
+    const wide = rows.map(([v, c, t, m], i) => [v, c, t, groups(subs[i]), madeBy(subs[i]), m]);
+    return [kind, '', ...table(['Value', 'Class', 'Template', 'Groups', 'Made by', 'Meaning'], wide), ...passthrough];
   }
   if (subs.some(s => s.emittedBy.length)) {
-    const wide = rows.map(([v, c, m], i) => [v, c, madeBy(subs[i]), m]);
-    return [kind, '', ...table(['Value', 'Class', 'Made by', 'Meaning'], wide), ...passthrough];
+    const wide = rows.map(([v, c, t, m], i) => [v, c, t, madeBy(subs[i]), m]);
+    return [kind, '', ...table(['Value', 'Class', 'Template', 'Made by', 'Meaning'], wide), ...passthrough];
   }
-  return [kind, '', ...table(['Value', 'Class', 'Meaning'], rows), ...passthrough];
+  return [kind, '', ...table(['Value', 'Class', 'Template', 'Meaning'], rows), ...passthrough];
 }
 
 function relationshipSection(model, cls) {

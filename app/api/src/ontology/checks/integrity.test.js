@@ -36,8 +36,8 @@ describe('checkIntegrity', () => {
   });
 
   it('flags an ia: IRI that is used but never declared (a typo)', () => {
-    const ttl = edit(MINI_TTL, 'ia:User a owl:Class ; rdfs:subClassOf ia:Principal ;', 'ia:User a owl:Class ; rdfs:subClassOf ia:Princpal ;');
-    expect(findings(ttl)).toEqual(['undeclared-term ia:Princpal', 'undeclared-reference ia:User', 'orphan-type-value ia:User']);
+    const ttl = edit(MINI_TTL, 'ia:User a owl:Class ; rdfs:subClassOf ia:Person ;', 'ia:User a owl:Class ; rdfs:subClassOf ia:Persn ;');
+    expect(findings(ttl)).toEqual(['undeclared-term ia:Persn', 'undeclared-reference ia:User', 'orphan-type-value ia:User']);
   });
 
   it('flags two different values for a single-valued annotation', () => {

@@ -33,8 +33,8 @@ describe('renderReference', () => {
   it('lists a closed discriminator as exact values and an open one as an open vocabulary', () => {
     expect(md).toContain('`principalType` accepts exactly these values:');
     expect(md).toContain('`resourceType` is an open vocabulary — any value is accepted.');
-    // An ownership subclass names its intermediate parent.
-    expect(md).toContain('| `GroupOwnership` | `ia:GroupOwnership` | (ia:OwnershipResource) Owners of a group. |');
+    // A type names its template, not its parent class.
+    expect(md).toContain('| `GroupOwnership` | `ia:GroupOwnership` | Permission | Owners of a group. |');
   });
 
   it('renders a column row with its references, values and ingest aliases', () => {
@@ -72,13 +72,13 @@ describe('renderReference — context types', () => {
   const md = renderReference(modelOf(CONTEXT_TTL));
 
   it('adds what a context type groups and what makes it', () => {
-    expect(md).toContain('| Value | Class | Groups | Made by | Meaning |');
-    expect(md).toContain('| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Principal | plugin `manager-hierarchy` | A team. |');
+    expect(md).toContain('| Value | Class | Template | Groups | Made by | Meaning |');
+    expect(md).toContain('| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Organizational unit | Principal | plugin `manager-hierarchy` | A team. |');
     // Target types sorted, and a type no plugin emits is made by application code.
-    expect(md).toContain('| `Tag` | `ia:TagContext` | Principal, Resource | application code | A label. |');
+    expect(md).toContain('| `Tag` | `ia:TagContext` | Tag | Principal, Resource | application code | A label. |');
   });
 
-  it('keeps the three-column table for type lists without context annotations', () => {
-    expect(md).toContain('| `GroupOwnership` | `ia:GroupOwnership` | (ia:OwnershipResource) Owners of a group. |');
+  it('keeps the four-column table for type lists without context annotations', () => {
+    expect(md).toContain('| `GroupOwnership` | `ia:GroupOwnership` | Permission | Owners of a group. |');
   });
 });

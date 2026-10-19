@@ -61,7 +61,10 @@ an exported constant that the code itself uses (`CONTEXT_VARIANTS`, `CONTEXT_TAR
 | `principalType` (closed) / `resourceType` (open) | subclasses with `ia:typeValue`; the parent has `ia:discriminator` (and `ia:openVocabulary true` when any value is accepted) | `ia:AIAgent` ⊑ `ia:Principal` |
 | `relationshipType` value | `owl:ObjectProperty` named lowerCamel of the value, with `ia:typeValue`, `ia:storedIn` the edge class, and the classes it connects as domain / range | `ia:hasAppRole`: `ia:Application` → `ia:AppRole` |
 | Closed value list (`assignmentType`, `origin`, `effect`, `variant`, …) | a class whose `owl:NamedIndividual`s are the values, named `<List>_<value>`; the column points at it with `ia:valueScheme` | `ia:AssignmentType_Direct` |
-| Ownership resources (`lib/ownershipTypes.js`) | subclasses of `ia:OwnershipResource` | `ia:GroupOwnership` |
+| A template (the level the application reasons at) | a class with `ia:template true` between the kind of node and its types; a template with one built-in type is that type's own class | `ia:TechnicalRole`, `ia:Person`, `ia:Group` |
+| What holding a resource reaches | `ia:expandsAccess` true (membership expands) or false (a control permission never does), inherited by the types below | `ia:Group` true, `ia:ControlPermission` false |
+| Ownership resources (`lib/ownershipTypes.js`) | subclasses of `ia:ControlPermission`, each the range of exactly one ownership relationship | `ia:GroupOwnership` |
+| Who answers for an account | the `ia:Accountability` value list (Personal, Shared, Autonomous), with `ia:accountabilityDefault` per principal type; declared ahead of its column | `ia:User` → Personal |
 | `contextType` (open) | subclasses of `ia:Context` named `<Value>Context`, with `ia:typeValue`, `ia:producedBy` (the plugin, if one emits it) and `ia:allowedTargetType` (the `ia:EntityKind` values it may group) | `ia:ManagerHierarchyContext` |
 
 Every term carries `rdfs:label`, `rdfs:comment` and `rdfs:isDefinedBy <https://identityatlas.io/ontology>`.
@@ -80,12 +83,55 @@ per-install layer, below).
 
 ---
 
+## Three layers, one way of holding
+
+The model separates *what exists*, *how things relate* and *who holds what*. The first two may grow
+as rich as the sources need; the third never does. That is what lets the ontology describe group
+ownership, agent ownership and business roles while every matrix cell keeps the same three values.
+
+| Layer | What it describes | May grow? | Where |
+|---|---|---|---|
+| **Things** | Accounts, resources, persons, groupings, systems; their types (the source's word) and templates (what the product does with them) | Yes; open vocabularies stay open | the node classes and their subclasses |
+| **Structure** | How things relate: resource to resource (`Contains`, `HasAppRole`, `HasOwnership` …), account to account (`Owner`, `Sponsor`), person to account, grouping to member | By a closed, extendable list of relationship types | the edge classes and the relationship-type properties |
+| **Holding** | Who holds which resource, and how | **No.** `assignmentType` is exactly `Direct`, `Indirect` or `Eligible`; `governed` and `origin` are flags on it | `ia:ResourceAssignment` only |
+
+**The rule:** a new kind of right is a new resource plus a relationship to what the right is about.
+It is never a new way of holding. So "owner of the group" is a resource of its own
+(`GroupOwnership`, a control permission), reached from the group through `HasOwnership`; Piet holds it
+`Direct`, or `Eligible` through PIM for Groups, like anything else. Owner and member refer to the
+same group through that link, not through the assignment. The only behaviour ownership has of its
+own is that holding it never makes the holder a member of what it controls: `ia:expandsAccess false`.
+
+| Concept | Things | Structure | Holding |
+|---|---|---|---|
+| Member of a group | Group | — | Direct |
+| Member through a nested group | Group | Contains between the groups | Indirect |
+| Owner of a group | GroupOwnership (control permission) | HasOwnership from the group | Direct |
+| Eligible directory role | EntraDirectoryRole (technical role) | — | Eligible |
+| Business role granted | BusinessRole | Contains the groups it bundles | Direct, governed |
+| Azure role inherited from a higher scope | AzureRoleAssignment | Contains between the scopes | Indirect |
+| App consent | DelegatedPermission / ApplicationPermission | DelegatesScope / HasApplicationPermission from the app | Direct |
+| Requested and approved | — | — | a flag: origin = Requested |
+| An AI agent acting for a person | AIAgent, accountability Personal | Owner link agent → person | — |
+| Member of a team | an OrganizationalUnit context | ContextMembers | — |
+
+Templates are the level the application reasons at: three for accounts (Person, Software, Agent),
+seven for resources (Group, TechnicalRole, Permission, Application, Scope, BusinessRole, Other) and
+four for contexts (OrganizationalUnit, LogicalApplication, Tag, Segment). Accounts have a second axis,
+**accountability** (Personal, Shared, Autonomous): a property of each account with a default per type;
+an AI agent's stays unknown until the source, an Owner or Sponsor link, or a person settles it. The
+ontology declares the templates, the defaults and the holding rule now (2.0.0); the columns that
+carry a template and an accountability per row, and the removal of the six root context types and
+of `ExternalUser`, follow in later pull requests.
+
+---
+
 ## Scope
 
 **In:** the five node and five edge tables above, every column of them, every closed value list
 the ingest or the database enforces on them, every relationship type, every principal type, the
 resource types the application's own code branches on (ownership, business role, group, the Entra
-application family, directory roles), and every type value something built in writes: what each
+application family, directory roles), every type under exactly one template, and every type value something built in writes: what each
 crawler declares in its manifest's `emits` block (`ia:emittedBy`), what each context-algorithm plugin
 emits (`ia:producedBy`), and every context type a route or screen compares against. Which crawlers
 also pass free values through from source data is recorded too (`ia:passthroughFrom`).
@@ -115,13 +161,14 @@ so a *new* ingest entity type cannot silently fall outside the model:
 | 5 | Every ingest field of a core entity is a column or a declared alias, with a compatible type | `SCHEMAS` fields | `ontology:check` |
 | 5 | Every column of every core table is described, with the same type; nothing described is missing; every `IN (…)` CHECK constraint equals the ontology's list | `information_schema.columns`, `pg_constraint` of a database migrated from scratch | contract test (`Contract Tests` job) |
 | 6 | No term declared twice or as two kinds, no conflicting annotations, no case-only clashes, no undeclared references, naming conventions | the ontology itself | `ontology:check` |
+| 4 | Templates and holding: every type has exactly one template among its ancestors or is one; `ia:expandsAccess` agrees with `GROUP_RESOURCE_TYPES` and `OWNERSHIP_RESOURCE_TYPES`; every control permission is the range of exactly one ownership relationship; an accountability default names an `ia:Accountability` value; `ia:ResourceAssignment` is the only edge table from an account or a person to a resource | the ontology, `effectiveAccess/engine.js`, `lib/ownershipTypes.js` | `ontology:check` |
 | 4 | Crawler types: each type a crawler manifest declares in `emits` is a subclass of the right core class whose `ia:emittedBy` names that crawler; each `ia:emittedBy` names a crawler that still declares it; `ia:passthroughFrom` equals the manifests' `emits.open` | every `tools/crawlers/*/crawler.json` (read through `crawlerManifests.js`) | `ontology:check` |
 | — | Every type literal a crawler's sources write is in its manifest's `emits` | the crawler sources (and the demo dataset for the demo crawler) | `ontology/crawlerEmits.guard.test.js` (unit job) |
 | — | Every `contextType` literal a plugin writes is in its own `contextTypes` | the plugin sources | `contexts/plugins/contextTypes.guard.test.js` (unit job) |
 | — | Every example in `ontology/examples` fits the ontology: each resource a concrete core class, each property allowed on its class, each reference to a resource of the right class, each value from its closed list, each context's `targetType` allowed by its type, each edge row with both ends | the ontology itself | `ontology:check` |
 | — | Data-model diagrams in the docs are generated, validated or marked out of scope; the generated reference page is current | the docs | `ontology:check` |
 
-**Not automated, deliberately:** whether a description is *right*; the prose type tables in
+**Not automated, deliberately:** whether a description is *right*; whether the code reads a template where it still keeps a list (that is the next phase); the prose type tables in
 `CLAUDE.md`, `docs/concepts/data-model.md` and `docs/architecture/ingest-api.md`; the literal values
 crawlers emit (the existing `assignmentTypes.guard.test.js` / `resourceTypes.guard.test.js` scans
 cover the retired ones); the relationship lines of hand-drawn diagrams; and the

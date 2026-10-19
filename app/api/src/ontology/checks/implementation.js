@@ -12,7 +12,8 @@
 //   5. every ingest field of a core entity is a described column (or a declared
 //      alias of one) with a compatible type;
 //   +  context types agree with the plugins and the code (./contexts.js), and
-//      the types each crawler declares it writes are defined (./crawlers.js).
+//      the types each crawler declares it writes are defined (./crawlers.js);
+//      every type has one template and holding stays closed (./templates.js).
 
 import { INGEST_TO_SQL } from '../vocabulary.js';
 import {
@@ -20,6 +21,7 @@ import {
 } from '../model.js';
 import { checkContextTypes } from './contexts.js';
 import { checkCrawlerTypes } from './crawlers.js';
+import { checkTemplates } from './templates.js';
 
 const err = (code, subject, message) => ({ code, subject, message });
 
@@ -105,17 +107,17 @@ function checkTypeLists(model, lists, rootClass) {
 
 function checkOwnership(model, registry) {
   const out = [];
-  const declared = typedSubclasses(model, 'OwnershipResource').map(c => c.typeValue);
+  const declared = typedSubclasses(model, 'ControlPermission').map(c => c.typeValue);
   const { missing, extra } = setDiff(registry.ownership.resourceTypes, declared);
-  for (const v of missing) out.push(err('ownership-type-missing', `Resource:${v}`, `lib/ownershipTypes.js lists "${v}" but it is not a subclass of ia:OwnershipResource`));
-  for (const v of extra) out.push(err('ownership-type-extra', `Resource:${v}`, `ia:OwnershipResource has "${v}" but lib/ownershipTypes.js does not list it, so consumers would count it as access`));
+  for (const v of missing) out.push(err('ownership-type-missing', `Resource:${v}`, `lib/ownershipTypes.js lists "${v}" but it is not a subclass of ia:ControlPermission`));
+  for (const v of extra) out.push(err('ownership-type-extra', `Resource:${v}`, `ia:ControlPermission has "${v}" but lib/ownershipTypes.js does not list it, so consumers would count it as access`));
 
   const ownershipRels = relationshipTypesOf(model, 'ResourceRelationship')
-    .filter(p => p.rangeClasses.length > 0 && p.rangeClasses.every(r => isSubClassOf(model, r, 'OwnershipResource')))
+    .filter(p => p.rangeClasses.length > 0 && p.rangeClasses.every(r => isSubClassOf(model, r, 'ControlPermission')))
     .map(p => p.typeValue);
   const rel = setDiff(registry.ownership.relationshipTypes, ownershipRels);
-  for (const v of rel.missing) out.push(err('ownership-relationship-range', `ResourceRelationship:${v}`, `lib/ownershipTypes.js treats "${v}" as an ownership link but its range is not an ownership resource`));
-  for (const v of rel.extra) out.push(err('ownership-relationship-unlisted', `ResourceRelationship:${v}`, `"${v}" points at ownership resources but lib/ownershipTypes.js does not list it`));
+  for (const v of rel.missing) out.push(err('ownership-relationship-range', `ResourceRelationship:${v}`, `lib/ownershipTypes.js treats "${v}" as an ownership link but its range is not a control permission`));
+  for (const v of rel.extra) out.push(err('ownership-relationship-unlisted', `ResourceRelationship:${v}`, `"${v}" points at control permissions but lib/ownershipTypes.js does not list it`));
   return out;
 }
 
@@ -167,5 +169,6 @@ export function checkImplementation(model, registry, config = {}) {
     ...checkPolymorphicTargets(model),
     ...checkContextTypes(model, registry),
     ...checkCrawlerTypes(model, registry),
+    ...checkTemplates(model, registry),
   ];
 }

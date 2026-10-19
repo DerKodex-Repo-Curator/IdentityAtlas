@@ -147,7 +147,8 @@ describe('checkImplementation', () => {
 
     it('fails when an ownership relationship does not point at ownership resources', () => {
       const ttl = edit(MINI_TTL, 'rdfs:domain ia:Resource ; rdfs:range ia:GroupOwnership ;', 'rdfs:domain ia:Resource ; rdfs:range ia:Group ;');
-      expect(run({ ttl })).toEqual(['ownership-relationship-range ResourceRelationship:HasOwnership']);
+      // …and the control permission is then the range of no ownership link at all.
+      expect(run({ ttl })).toEqual(['ownership-relationship-range ResourceRelationship:HasOwnership', 'control-permission-link ia:GroupOwnership']);
     });
 
     it('fails when a relationship points at ownership resources but the code list misses it', () => {
@@ -167,7 +168,8 @@ describe('checkImplementation', () => {
     it('accepts a subclass on either end', () => {
       const ttl = edit(MINI_TTL, 'rdfs:domain ia:Resource ; rdfs:range ia:Resource ; rdfs:label "contains"', 'rdfs:domain ia:Group ; rdfs:range ia:GroupOwnership ; rdfs:label "contains"');
       // contains now also points at ownership resources only, so the ownership list must name it.
-      expect(run({ ttl })).toEqual(['ownership-relationship-unlisted ResourceRelationship:Contains']);
+      // …and GroupOwnership is now the range of two ownership links, where exactly one is allowed.
+      expect(run({ ttl })).toEqual(['ownership-relationship-unlisted ResourceRelationship:Contains', 'control-permission-link ia:GroupOwnership']);
     });
   });
 

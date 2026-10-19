@@ -62,7 +62,7 @@ Add it to `PRINCIPAL_TYPES` and add a subclass of `ia:Principal` with `ia:typeVa
 `resourceType` is an open vocabulary: a crawler may send anything, and those values do not belong in
 the core. Only when *application code* starts to branch on a value — it appears in
 `OWNERSHIP_RESOURCE_TYPES`, `HIDDEN_BY_DEFAULT_RESOURCE_TYPES`, `GROUP_RESOURCE_TYPES` or a similar
-list the registry reads — add a subclass of `ia:Resource` (or of `ia:OwnershipResource` for an
+list the registry reads — add a subclass of `ia:Resource` (or of `ia:ControlPermission` for an
 ownership type) with `ia:typeValue`.
 
 ### A context type
@@ -101,6 +101,25 @@ description; a context type also needs `ia:allowedTargetType`). A crawler that s
 through adds it to `emits.open` and to `ia:passthroughFrom` on the core class.
 `crawlerEmits.guard.test.js` fails when a crawler's sources write a type literal its `emits` leaves
 out.
+
+### A template
+
+A template (`ia:template true`) is the level the application reasons at. Every type under
+`ia:Principal`, `ia:Resource` or `ia:Context` must have exactly one template among its ancestors,
+or be one itself (a template with a single built-in type is that type's own class, like `ia:Group`).
+To add a type, put it under the template that says what the product should do with it; the check
+fails on a type with none or with two. A new template is a new intermediate class with a label, a
+description and a contract in its comment, and a pull request that says why the existing ones do
+not fit. The template names are the ones on [The Ontology, Visually](../concepts/ontology.md#the-types).
+
+A resource template or type says whether holding it reaches what it contains: `ia:expandsAccess`
+true (`ia:Group`), false (`ia:ControlPermission`: owning is not being a member), or unset. The lists
+in `effectiveAccess/engine.js` and `lib/ownershipTypes.js` must agree. A control permission must be the
+range of exactly one ownership relationship, the link from the object it controls.
+
+**Holding never grows.** An account reaches a resource only through `ia:ResourceAssignment`, held
+`Direct`, `Indirect` or `Eligible`. A new kind of right is a new resource plus a relationship; the
+check refuses a second edge table from an account or a person to a resource.
 
 ### A new column
 
@@ -155,6 +174,10 @@ only shrinks: an entry that no longer matches a finding fails as `stale-known-ga
 | `relationship-endpoint-mismatch`, `polymorphic-target-mismatch`, `fk-type-mismatch` | a relationship does not fit its edge table |
 | `context-type-undefined`, `context-type-unused`, `context-producer-*`, `context-target-type-mismatch`, `plugin-context-types-undeclared` | context types differ between the plugins, the code and the ontology |
 | `context-target-type-missing`, `context-target-type-invalid`, `context-annotation-misplaced` | a context type's annotations are incomplete or misplaced |
+| `template-missing`, `template-ambiguous`, `template-misplaced` | a type has no template, two templates, or a template sits outside the three kinds of node |
+| `expands-access-mismatch`, `control-permission-link` | what holding a resource reaches differs from the engine, or a control permission is not linked to what it controls |
+| `accountability-default-misplaced`, `accountability-default-invalid` | an accountability default sits on the wrong class or names no `ia:Accountability` value |
+| `holding-bypass` | an edge table other than `ResourceAssignments` runs from an account or a person to a resource |
 | `crawler-type-undefined`, `crawler-emitter-*`, `crawler-passthrough-mismatch`, `crawler-emits-invalid` | the types a crawler manifest declares differ from the ontology |
 | `emitted-by-misplaced`, `passthrough-misplaced` | a crawler annotation sits on the wrong kind of class |
 | `conflicting-declaration`, `conflicting-annotation`, `duplicate-identifier`, `duplicate-type-value`, `undeclared-term`, `undeclared-reference`, `naming-convention` | the ontology contradicts itself |

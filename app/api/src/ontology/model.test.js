@@ -72,7 +72,7 @@ describe('model helpers', () => {
 
   it('isSubClassOf follows the hierarchy transitively and stops on a cycle', () => {
     expect(isSubClassOf(model, 'GroupOwnership', 'Resource')).toBe(true);
-    expect(isSubClassOf(model, 'Group', 'OwnershipResource')).toBe(false);
+    expect(isSubClassOf(model, 'Group', 'ControlPermission')).toBe(false);
     expect(isSubClassOf(model, 'Resource', 'Resource')).toBe(true);
     const cyclic = modelOf(`${MINI_TTL}\nia:Node rdfs:subClassOf ia:Group .`);
     expect(isSubClassOf(cyclic, 'Group', 'Principal')).toBe(false);

@@ -38,10 +38,14 @@ ia:Principal a owl:Class ; rdfs:subClassOf ia:Node ; ${d('Principal', 'An accoun
 ia:Resource a owl:Class ; rdfs:subClassOf ia:Node ; ${d('Resource', 'A grant.')} ;
     ia:table "Resources" ; ia:identifierColumn "id" ; ia:identifierSqlType "uuid" ; ia:ingestEntity "resources" ;
     ia:discriminator "resourceType" ; ia:openVocabulary true .
-ia:User a owl:Class ; rdfs:subClassOf ia:Principal ; ia:typeValue "User" ; ${d('User', 'A person account.')} .
-ia:Group a owl:Class ; rdfs:subClassOf ia:Resource ; ia:typeValue "Group" ; ${d('Group', 'A group.')} .
-ia:OwnershipResource a owl:Class ; rdfs:subClassOf ia:Resource ; ${d('Ownership resource', 'Owners of something.')} .
-ia:GroupOwnership a owl:Class ; rdfs:subClassOf ia:OwnershipResource ; ia:typeValue "GroupOwnership" ; ${d('Group ownership', 'Owners of a group.')} .
+ia:User a owl:Class ; rdfs:subClassOf ia:Person ; ia:typeValue "User" ; ${d('User', 'A person account.')} .
+ia:Group a owl:Class ; rdfs:subClassOf ia:Resource ; ia:typeValue "Group" ; ia:template true ; ia:expandsAccess true ; ${d('Group', 'A group.')} .
+ia:template a owl:AnnotationProperty . ia:expandsAccess a owl:AnnotationProperty . ia:accountabilityDefault a owl:AnnotationProperty .
+ia:Person a owl:Class ; rdfs:subClassOf ia:Principal ; ia:template true ; ${d('Person', 'A human uses it.')} .
+ia:TechnicalRole a owl:Class ; rdfs:subClassOf ia:Resource ; ia:template true ; ${d('Technical role', 'A bundle of rights.')} .
+ia:Permission a owl:Class ; rdfs:subClassOf ia:Resource ; ia:template true ; ${d('Permission', 'One right.')} .
+ia:ControlPermission a owl:Class ; rdfs:subClassOf ia:Permission ; ia:expandsAccess false ; ${d('Control permission', 'A right over another object.')} .
+ia:GroupOwnership a owl:Class ; rdfs:subClassOf ia:ControlPermission ; ia:typeValue "GroupOwnership" ; ${d('Group ownership', 'Owners of a group.')} .
 
 ia:ResourceRelationship a owl:Class ; rdfs:subClassOf ia:Edge ; ${d('Resource relationship', 'Parent to child.')} ;
     ia:table "ResourceRelationships" ; ia:ingestEntity "resource-relationships" ; ia:typeColumn "relationshipType" ;
@@ -95,6 +99,7 @@ export function miniRegistry() {
     resourceTypeLists: { 'test GROUPS': ['Group'] },
     principalTypeLists: { 'test HUMANS': ['User'] },
     ownership: { resourceTypes: ['GroupOwnership'], relationshipTypes: ['HasOwnership'] },
+    access: { expands: ['Group'], never: ['GroupOwnership'] },
   };
 }
 
@@ -121,9 +126,10 @@ ia:Context a owl:Class ; rdfs:subClassOf ia:Node ; ${d('Context', 'A grouping.')
 ia:EntityKind a owl:Class ; ${d('Entity kind', 'What a context groups.')} .
 ia:EntityKind_Principal a owl:NamedIndividual, ia:EntityKind ; ia:typeValue "Principal" ; ${d('Principal', 'Accounts.')} .
 ia:EntityKind_Resource a owl:NamedIndividual, ia:EntityKind ; ia:typeValue "Resource" ; ${d('Resource', 'Resources.')} .
-ia:ManagerHierarchyContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "ManagerHierarchy" ;
+ia:OrganizationalUnit a owl:Class ; rdfs:subClassOf ia:Context ; ia:template true ; ${d('Organizational unit', 'Org structure.')} .
+ia:ManagerHierarchyContext a owl:Class ; rdfs:subClassOf ia:OrganizationalUnit ; ia:typeValue "ManagerHierarchy" ;
     ia:producedBy "manager-hierarchy" ; ia:allowedTargetType ia:EntityKind_Principal ; ${d('Manager node', 'A team.')} .
-ia:TagContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "Tag" ;
+ia:TagContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "Tag" ; ia:template true ;
     ia:allowedTargetType ia:EntityKind_Principal, ia:EntityKind_Resource ; ${d('Tag', 'A label.')} .
 ia:targetType a owl:DatatypeProperty ; ia:sqlType "text" ; ia:valueScheme ia:EntityKind ;
     rdfs:domain ia:Context ; rdfs:range xsd:string ; ${d('targetType', 'What it groups.')} .

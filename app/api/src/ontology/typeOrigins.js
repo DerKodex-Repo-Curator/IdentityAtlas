@@ -10,6 +10,18 @@
 
 import { isSubClassOf } from './model.js';
 
+/** The template a type falls under: the nearest ancestor-or-self with ia:template, or null. */
+export function templateOf(model, cls) {
+  let cur = cls;
+  const seen = new Set();
+  while (cur && !seen.has(cur.local)) {
+    if (cur.template) return cur;
+    seen.add(cur.local);
+    cur = model.classes.get(cur.superClasses[0]);
+  }
+  return null;
+}
+
 export const ORIGIN_LABELS = {
   plugin: 'Made by a context plugin',
   crawler: 'Written by a crawler',

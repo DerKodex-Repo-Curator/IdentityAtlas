@@ -120,7 +120,7 @@ describe('checkIntegrity — crawler annotations', () => {
   const findings = (ttl) => checkIntegrity(modelOf(ttl)).map(f => `${f.code} ${f.subject}`);
 
   it('rejects ia:emittedBy on a class that is not a type', () => {
-    expect(findings(`${CRAWLER_TTL}\nia:OwnershipResource ia:emittedBy "hr" .`)).toEqual(['emitted-by-misplaced ia:OwnershipResource']);
+    expect(findings(`${CRAWLER_TTL}\nia:ControlPermission ia:emittedBy "hr" .`)).toEqual(['emitted-by-misplaced ia:ControlPermission']);
   });
 
   it('rejects ia:passthroughFrom on a class without a discriminator', () => {
