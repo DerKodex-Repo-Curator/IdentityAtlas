@@ -232,6 +232,18 @@ function checkContextClasses(model) {
   return out;
 }
 
+// ia:emittedBy belongs on a type (a class with ia:typeValue below a
+// discriminated class); ia:passthroughFrom on the discriminated class itself.
+function checkCrawlerAnnotations(model) {
+  const out = [];
+  for (const c of model.classes.values()) {
+    const s = `ia:${c.local}`;
+    if (c.emittedBy.length && !c.typeValue) out.push(err('emitted-by-misplaced', s, 'ia:emittedBy belongs on a type with ia:typeValue'));
+    if (c.passthroughFrom.length && !c.discriminator) out.push(err('passthrough-misplaced', s, 'ia:passthroughFrom belongs on a class with ia:discriminator'));
+  }
+  return out;
+}
+
 /** All structural checks. Returns a list of { code, subject, message }. */
 export function checkIntegrity(model) {
   return [
@@ -245,5 +257,6 @@ export function checkIntegrity(model) {
     ...checkIndividuals(model),
     ...checkEdges(model),
     ...checkContextClasses(model),
+    ...checkCrawlerAnnotations(model),
   ];
 }

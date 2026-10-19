@@ -22,6 +22,7 @@ import { checkDiagrams, diagramInventory, renderGeneratedRegions } from './docsD
 import { GENERATED_DIAGRAMS } from './mermaid.js';
 import { renderReference } from './referenceDoc.js';
 import { checkExample, exampleDiagram, readInstances } from './example.js';
+import { TYPE_DIAGRAMS } from './typeDiagrams.js';
 import { loadRegistry } from './registry.js';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -73,9 +74,9 @@ export function loadExamples(root = REPO_ROOT) {
   return { examples, errors };
 }
 
-/** The diagram generators: the model ones plus one picture per example (example-<name>). */
+/** The diagram generators: the model ones, the type diagrams, and one picture per example (example-<name>). */
 export function diagramGenerators(examples) {
-  const gens = { ...GENERATED_DIAGRAMS };
+  const gens = { ...GENERATED_DIAGRAMS, ...TYPE_DIAGRAMS };
   for (const ex of examples) gens[`example-${ex.name}`] = (model) => exampleDiagram(model, ex.instances);
   return gens;
 }

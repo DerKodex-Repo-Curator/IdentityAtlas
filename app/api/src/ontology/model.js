@@ -88,6 +88,8 @@ function buildClass(store, iri) {
     // Sorted: the store's order is an implementation detail, the docs must be stable.
     producedBy: values(store, iri, ia('producedBy')).sort(),
     allowedTargetTypes: locals(values(store, iri, ia('allowedTargetType'))).sort(),
+    emittedBy: values(store, iri, ia('emittedBy')).sort(),
+    passthroughFrom: values(store, iri, ia('passthroughFrom')).sort(),
   };
 }
 

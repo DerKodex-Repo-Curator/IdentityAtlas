@@ -14,6 +14,7 @@ import { GROUP_RESOURCE_TYPES } from '../effectiveAccess/engine.js';
 import { NON_HUMAN_PRINCIPAL_TYPES } from '../accountlinking/orphanQuery.js';
 import { REGISTERED_PLUGINS } from '../contexts/plugins/registry.js';
 import { scanContextTypeUsage } from './contextTypeUsage.js';
+import { _crawlerManifests } from '../crawlerManifests.js';
 
 /**
  * Snapshot of every code-side registry the ontology must agree with.
@@ -26,6 +27,9 @@ import { scanContextTypeUsage } from './contextTypeUsage.js';
  *   contexts          — what each context-algorithm plugin emits (name,
  *                       targetType, contextTypes), and the contextType values
  *                       the rest of the code compares against, with where
+ *   crawlers          — what each crawler manifest declares it writes
+ *                       (crawler.json `emits`: fixed types per field, and the
+ *                       fields it passes free values through for)
  */
 export function loadRegistry() {
   const ingest = {};
@@ -50,5 +54,6 @@ export function loadRegistry() {
       plugins: REGISTERED_PLUGINS.map(p => ({ name: p.name, targetType: p.targetType, contextTypes: p.contextTypes })),
       branchedOn: scanContextTypeUsage(),
     },
+    crawlers: Object.values(_crawlerManifests).map(m => ({ type: m.type, emits: m.emits })),
   };
 }

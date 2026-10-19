@@ -72,10 +72,25 @@ describe('core ontology (repository)', () => {
       .toEqual(['context-target-type-mismatch ia:ManagerHierarchyContext']);
   });
 
+  it('reads every crawler manifest, each with an emits block', () => {
+    const { crawlers } = loadRegistry();
+    expect(crawlers.length).toBeGreaterThan(5);
+    expect(crawlers.filter(c => !c.emits).map(c => c.type)).toEqual([]);
+  });
+
+  it('fails for a type a crawler writes but the ontology lacks', () => {
+    const registry = loadRegistry();
+    // Copy, do not mutate: the manifests are shared, module-level objects.
+    const [first] = registry.crawlers;
+    registry.crawlers = [{ ...first, emits: { ...first.emits, resourceTypes: [...first.emits.resourceTypes, 'MysteryRole'] } }, ...registry.crawlers.slice(1)];
+    expect(runCheck({ registry }).errors.map(e => `${e.code} ${e.subject}`))
+      .toEqual(['crawler-type-undefined Resource:MysteryRole']);
+  });
+
   it('fails for a context type the code compares against but the ontology lacks', () => {
     const registry = loadRegistry();
-    registry.contexts.branchedOn.set('OrgUnit', ['app/api/src/routes/example.js:1']);
+    registry.contexts.branchedOn.set('Position', ['app/api/src/routes/example.js:1']);
     expect(runCheck({ registry }).errors.map(e => `${e.code} ${e.subject}`))
-      .toEqual(['context-type-undefined Context:OrgUnit']);
+      .toEqual(['context-type-undefined Context:Position']);
   });
 });

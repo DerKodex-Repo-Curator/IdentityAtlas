@@ -7,4 +7,6 @@
 - Documented how the manager hierarchy is built: who is a member of which team, how the manager of a team is recorded, and what happens with unknown managers and reporting loops
 - Added "The Ontology, Visually" to the documentation: a picture of the whole model, one small team drawn as real data, excerpts of the schema file, download links, and how to open it in Protégé, WebVOWL or Python
 - Corrected documentation that still described retired assignment types (Governed, AppRoleViaGroup, OAuth2Grant), the old tag and risk-profile tables, and a few relationship cardinalities
+- The ontology and the documentation now list every account, resource and grouping type Identity Atlas writes — including the Azure types, OrgUnit, Location, CostCenter, LogicalApplication, Entitlement and Service — with the crawler or plugin that writes each one, drawn as type diagrams on "The Ontology, Visually"
+- Each crawler now declares the types it writes; CI fails when a crawler starts writing a type that is not in the ontology
 - CI now also fails when a context plugin starts writing a context type, or grouping a different kind of entity, that the ontology does not describe

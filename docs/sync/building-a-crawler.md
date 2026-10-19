@@ -38,6 +38,12 @@ Restart the worker container after adding the folder. The new crawler appears in
 ```json
 {
   "type": "my-source",
+  "emits": {
+    "principalTypes": ["User"],
+    "resourceTypes": ["Entitlement"],
+    "contextTypes": [],
+    "open": ["resourceType"]
+  },
   "displayName": "My Source System",
   "entryPoint": "Start-MySourceCrawler.ps1",
   "dependsOn": [],
@@ -56,6 +62,7 @@ Restart the worker container after adding the folder. The new crawler appears in
 | Field | Required | Description |
 |---|---|---|
 | `type` | ✅ | Unique key — becomes the `jobType` in `CrawlerJobs`. Use the folder name. |
+| `emits` | ✅ | The types this crawler writes: `principalTypes`, `resourceTypes` and `contextTypes` list the fixed values and the defaults of its built-in mappings; `open` lists the type fields (`principalType`, `resourceType`, `contextType`) it fills from source data or configuration. CI checks every value against the [core ontology](../concepts/ontology.md#the-types), and checks that your sources write no type literal the list leaves out. A new type value therefore needs a class in `ontology/core.ttl` with `ia:emittedBy "<your type>"` — see [Maintaining the Core Ontology](../contributing/maintaining-the-ontology.md#a-type-a-crawler-writes). |
 | `displayName` | ✅ | Name shown in the UI. |
 | `entryPoint` | ✅ | Entry point filename, relative to the crawler folder. |
 | `dependsOn` | — | Other crawler types whose library files are dot-sourced before this one runs. |

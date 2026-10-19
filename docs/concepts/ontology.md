@@ -76,7 +76,162 @@ flowchart LR
 
 Each kind has **types** below it. A Principal is a `User`, an `AIAgent`, a `ServicePrincipal` …; a
 Resource is a `Group`, an `AppRole`, a `BusinessRole` …; a Context is a `ManagerHierarchy` node, a
-`Department`, a `Tag` …. The full type tree is drawn on the [Core Model Reference](../reference/core-model.md).
+`Department`, a `Tag` …. The next section shows them all.
+
+---
+
+## The types
+
+Each kind of node has **types**: a value in its type column (`principalType`, `resourceType`,
+`contextType`) that says what sort of account, resource or grouping a row is. The diagrams below
+show every type the ontology defines, grouped by **where it comes from**: written by a crawler, made
+by a context plugin, created by the application itself, or accepted without a built-in source. The
+small text under a type names the crawlers and plugins that write it.
+
+### Account types (Principal)
+
+`principalType` is a **closed list**: the ingest accepts only these values. Crawlers that map types
+from their source (Omada, midPoint, SCIM, CSV, SQL) map onto this list.
+
+<!-- BEGIN GENERATED: ontology types-principal -->
+```mermaid
+flowchart LR
+    root["Principal<br/><small>principalType</small>"]:::Principal
+    subgraph g_crawler["Written by a crawler"]
+      direction LR
+      t_AIAgent["AIAgent<br/><small>demo, entra-id</small>"]:::Principal
+      t_ExternalUser["ExternalUser<br/><small>demo, omada</small>"]:::Principal
+      t_ManagedIdentity["ManagedIdentity<br/><small>demo, entra-id</small>"]:::Principal
+      t_ServicePrincipal["ServicePrincipal<br/><small>demo, entra-id, omada</small>"]:::Principal
+      t_SharedMailbox["SharedMailbox<br/><small>demo</small>"]:::Principal
+      t_User["User<br/><small>azure-rm, csv, demo, entra-id, midpoint, mssql, omada, scim</small>"]:::Principal
+      t_AIAgent ~~~ t_ExternalUser ~~~ t_ManagedIdentity ~~~ t_ServicePrincipal
+      t_SharedMailbox ~~~ t_User
+    end
+    subgraph g_accepted["Accepted, no built-in source"]
+      direction LR
+      t_WorkloadIdentity["WorkloadIdentity"]:::Principal
+    end
+    root --> g_crawler
+    root --> g_accepted
+    classDef Principal fill:#2563eb,stroke:#1e40af,color:#fff
+```
+<!-- END GENERATED: ontology types-principal -->
+
+### Resource types (Resource)
+
+`resourceType` is an **open list**: any value is accepted, because every system names its own kinds
+of access. Defined here are the values Identity Atlas itself writes or relies on. The dotted arrow
+names the crawlers that also pass values through from their source data or configuration.
+
+<!-- BEGIN GENERATED: ontology types-resource -->
+```mermaid
+flowchart LR
+    root["Resource<br/><small>resourceType</small>"]:::Resource
+    subgraph g_crawler["Written by a crawler"]
+      direction LR
+      t_AppRole["AppRole<br/><small>demo, entra-id</small>"]:::Resource
+      t_Application["Application<br/><small>demo, entra-id</small>"]:::Resource
+      t_ApplicationOwnership["ApplicationOwnership<br/><small>demo, entra-id</small>"]:::Resource
+      t_ApplicationPermission["ApplicationPermission<br/><small>entra-id</small>"]:::Resource
+      t_AzureManagementGroup["AzureManagementGroup<br/><small>azure-rm</small>"]:::Resource
+      t_AzureResource["AzureResource<br/><small>azure-rm, demo</small>"]:::Resource
+      t_AzureResourceGroup["AzureResourceGroup<br/><small>azure-rm, demo</small>"]:::Resource
+      t_AzureRoleAssignment["AzureRoleAssignment<br/><small>azure-rm, demo</small>"]:::Resource
+      t_AzureScope["AzureScope<br/><small>azure-rm, demo</small>"]:::Resource
+      t_AzureSubscription["AzureSubscription<br/><small>azure-rm</small>"]:::Resource
+      t_BusinessRole["BusinessRole<br/><small>csv, demo, entra-id, midpoint, mssql, omada</small>"]:::Resource
+      t_CRMRole["CRMRole<br/><small>demo</small>"]:::Resource
+      t_DelegatedPermission["DelegatedPermission<br/><small>demo, entra-id</small>"]:::Resource
+      t_Entitlement["Entitlement<br/><small>midpoint, mssql</small>"]:::Resource
+      t_EntraDirectoryRole["EntraDirectoryRole<br/><small>demo, entra-id</small>"]:::Resource
+      t_Group["Group<br/><small>demo, entra-id, scim</small>"]:::Resource
+      t_GroupOwnership["GroupOwnership<br/><small>demo, entra-id</small>"]:::Resource
+      t_Resource["Resource<br/><small>omada</small>"]:::Resource
+      t_ResourceOwnership["ResourceOwnership<br/><small>mssql</small>"]:::Resource
+      t_SAPRole["SAPRole<br/><small>demo</small>"]:::Resource
+      t_Service["Service<br/><small>midpoint</small>"]:::Resource
+      t_ServicePrincipalOwnership["ServicePrincipalOwnership<br/><small>demo, entra-id</small>"]:::Resource
+      t_AppRole ~~~ t_Application ~~~ t_ApplicationOwnership ~~~ t_ApplicationPermission
+      t_AzureManagementGroup ~~~ t_AzureResource ~~~ t_AzureResourceGroup ~~~ t_AzureRoleAssignment
+      t_AzureScope ~~~ t_AzureSubscription ~~~ t_BusinessRole ~~~ t_CRMRole
+      t_DelegatedPermission ~~~ t_Entitlement ~~~ t_EntraDirectoryRole ~~~ t_Group
+      t_GroupOwnership ~~~ t_Resource ~~~ t_ResourceOwnership ~~~ t_SAPRole
+      t_Service ~~~ t_ServicePrincipalOwnership
+    end
+    root --> g_crawler
+    other["any other value<br/><small>from csv, custom-connector, midpoint, mssql, omada</small>"]
+    root -.-> other
+    classDef Resource fill:#059669,stroke:#047857,color:#fff
+```
+<!-- END GENERATED: ontology types-resource -->
+
+### Grouping types (Context)
+
+`contextType` is an open list too. A context groups one kind of node; the
+[Core Model Reference](../reference/core-model.md#contexts) lists which kind each type groups.
+`OrgUnit` (synced from an IGA or HR source, grouping persons) and `OrganisationalUnit` (derived by a
+plugin from accounts' AD distinguished names) are two different values today.
+
+<!-- BEGIN GENERATED: ontology types-context -->
+```mermaid
+flowchart LR
+    root["Context<br/><small>contextType</small>"]:::Context
+    subgraph g_plugin["Made by a context plugin"]
+      direction LR
+      t_ContextRecipe["ContextRecipe<br/><small>context-recipe</small>"]:::Context
+      t_Department["Department<br/><small>department-from-principal, demo, omada</small>"]:::Context
+      t_EntraGroupCategory["EntraGroupCategory<br/><small>entra-group-category-tree</small>"]:::Context
+      t_EntraGroupRoot["EntraGroupRoot<br/><small>entra-group-category-tree</small>"]:::Context
+      t_ManagerHierarchy["ManagerHierarchy<br/><small>manager-hierarchy</small>"]:::Context
+      t_OrganisationalUnit["OrganisationalUnit<br/><small>ad-ou-from-dn</small>"]:::Context
+      t_OrphanedAccounts["OrphanedAccounts<br/><small>orphaned-accounts</small>"]:::Context
+      t_PrincipalType["PrincipalType<br/><small>principal-type-tree</small>"]:::Context
+      t_PrincipalTypeRoot["PrincipalTypeRoot<br/><small>principal-type-tree</small>"]:::Context
+      t_ResourceCluster["ResourceCluster<br/><small>resource-cluster</small>"]:::Context
+      t_ResourcePlane["ResourcePlane<br/><small>resource-type-tree</small>"]:::Context
+      t_ResourceRole["ResourceRole<br/><small>resource-type-tree</small>"]:::Context
+      t_ResourceType["ResourceType<br/><small>resource-type-tree</small>"]:::Context
+      t_ResourceTypeRoot["ResourceTypeRoot<br/><small>resource-type-tree</small>"]:::Context
+      t_RiskyAppConsent["RiskyAppConsent<br/><small>risky-consent</small>"]:::Context
+      t_RiskyConsent["RiskyConsent<br/><small>risky-consent</small>"]:::Context
+      t_Scope["Scope<br/><small>scope-hierarchy</small>"]:::Context
+      t_ScopeHierarchy["ScopeHierarchy<br/><small>scope-hierarchy</small>"]:::Context
+      t_SystemMembership["SystemMembership<br/><small>system-membership-principals, system-membership-resources</small>"]:::Context
+      t_SystemMembershipRoot["SystemMembershipRoot<br/><small>system-membership-principals, system-membership-resources</small>"]:::Context
+      t_ContextRecipe ~~~ t_Department ~~~ t_EntraGroupCategory ~~~ t_EntraGroupRoot
+      t_ManagerHierarchy ~~~ t_OrganisationalUnit ~~~ t_OrphanedAccounts ~~~ t_PrincipalType
+      t_PrincipalTypeRoot ~~~ t_ResourceCluster ~~~ t_ResourcePlane ~~~ t_ResourceRole
+      t_ResourceType ~~~ t_ResourceTypeRoot ~~~ t_RiskyAppConsent ~~~ t_RiskyConsent
+      t_Scope ~~~ t_ScopeHierarchy ~~~ t_SystemMembership ~~~ t_SystemMembershipRoot
+    end
+    subgraph g_crawler["Written by a crawler"]
+      direction LR
+      t_AdministrativeUnit["AdministrativeUnit<br/><small>demo</small>"]:::Context
+      t_CostCenter["CostCenter<br/><small>omada</small>"]:::Context
+      t_Location["Location<br/><small>omada</small>"]:::Context
+      t_LogicalApplication["LogicalApplication<br/><small>mssql</small>"]:::Context
+      t_OrgUnit["OrgUnit<br/><small>csv, midpoint, omada</small>"]:::Context
+      t_Team["Team<br/><small>demo</small>"]:::Context
+      t_AdministrativeUnit ~~~ t_CostCenter ~~~ t_Location ~~~ t_LogicalApplication
+      t_OrgUnit ~~~ t_Team
+    end
+    subgraph g_code["Created by the application"]
+      direction LR
+      t_Tag["Tag"]:::Context
+      t_TagGroup["TagGroup"]:::Context
+      t_Tag ~~~ t_TagGroup
+    end
+    root --> g_plugin
+    root --> g_crawler
+    root --> g_code
+    other["any other value<br/><small>from csv, custom-connector, midpoint, mssql, omada</small>"]
+    root -.-> other
+    classDef Context fill:#d97706,stroke:#b45309,color:#fff
+```
+<!-- END GENERATED: ontology types-context -->
+
+Every type, with its description, is in the tables of the [Core Model Reference](../reference/core-model.md).
 
 ---
 

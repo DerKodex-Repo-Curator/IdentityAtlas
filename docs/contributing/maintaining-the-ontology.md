@@ -90,6 +90,18 @@ region. [The Ontology, Visually](../concepts/ontology.md) shows `team.ttl` this 
 file itself through `pymdownx.snippets`, as it quotes the excerpts of `core.ttl` marked with
 `# --8<-- [start:…]` / `[end:…]` comment lines. Keep those markers around the term when you edit it.
 
+### A type a crawler writes
+
+Every crawler manifest declares in `emits` which principal, resource and context types it writes
+(fixed values and the defaults of its built-in mappings) and, in `emits.open`, which type fields it
+fills from source data or configuration. When a crawler starts writing a new value, add it to its
+`emits` list and give the class `ia:emittedBy "<crawler type>"` — a new class for a new value (a
+subclass of `ia:Principal`, `ia:Resource` or `ia:Context`, with `ia:typeValue`, a label and a
+description; a context type also needs `ia:allowedTargetType`). A crawler that starts passing a field
+through adds it to `emits.open` and to `ia:passthroughFrom` on the core class.
+`crawlerEmits.guard.test.js` fails when a crawler's sources write a type literal its `emits` leaves
+out.
+
 ### A new column
 
 Add a property named exactly like the column, with `ia:sqlType` set to the type
@@ -143,6 +155,8 @@ only shrinks: an entry that no longer matches a finding fails as `stale-known-ga
 | `relationship-endpoint-mismatch`, `polymorphic-target-mismatch`, `fk-type-mismatch` | a relationship does not fit its edge table |
 | `context-type-undefined`, `context-type-unused`, `context-producer-*`, `context-target-type-mismatch`, `plugin-context-types-undeclared` | context types differ between the plugins, the code and the ontology |
 | `context-target-type-missing`, `context-target-type-invalid`, `context-annotation-misplaced` | a context type's annotations are incomplete or misplaced |
+| `crawler-type-undefined`, `crawler-emitter-*`, `crawler-passthrough-mismatch`, `crawler-emits-invalid` | the types a crawler manifest declares differ from the ontology |
+| `emitted-by-misplaced`, `passthrough-misplaced` | a crawler annotation sits on the wrong kind of class |
 | `conflicting-declaration`, `conflicting-annotation`, `duplicate-identifier`, `duplicate-type-value`, `undeclared-term`, `undeclared-reference`, `naming-convention` | the ontology contradicts itself |
 | `db-column-undescribed`, `db-column-missing`, `db-column-type`, `db-check-mismatch`, `db-check-not-in-ontology` | the migrated database differs (contract test) |
 | `example-type`, `example-property`, `example-domain`, `example-range`, `example-dangling`, `example-value`, `example-target-type`, `example-edge-ends`, `example-empty` | an example in `ontology/examples` does not fit the ontology |

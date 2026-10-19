@@ -85,8 +85,10 @@ per-install layer, below).
 **In:** the five node and five edge tables above, every column of them, every closed value list
 the ingest or the database enforces on them, every relationship type, every principal type, the
 resource types the application's own code branches on (ownership, business role, group, the Entra
-application family, directory roles), and the context types the application knows: every type a
-context-algorithm plugin emits and every type a route or screen compares against.
+application family, directory roles), and every type value something built in writes: what each
+crawler declares in its manifest's `emits` block (`ia:emittedBy`), what each context-algorithm plugin
+emits (`ia:producedBy`), and every context type a route or screen compares against. Which crawlers
+also pass free values through from source data is recorded too (`ia:passthroughFrom`).
 
 **Out, for now** — each is declared with a reason in
 [`ontology/validation.json`](https://github.com/Fortigi/IdentityAtlas/blob/main/ontology/validation.json),
@@ -95,10 +97,8 @@ so a *new* ingest entity type cannot silently fall outside the model:
 - the governance satellite tables (GovernanceCatalogs, AssignmentPolicies, AssignmentRequests,
   CertificationDecisions) — business roles themselves *are* in the core, as Resources;
 - PrincipalActivity and RiskScores;
-- resource types that only one crawler emits (`Entitlement`, `Service`, Omada's `Resource`,
-  Azure RM types, whatever a CSV or SQL source calls things) and the `contextType` values crawlers
-  sync (`OrgUnit`, `Location`, `CostCenter`, `LogicalApplication` …) — these are exactly what the
-  dynamic layer is for.
+- the values a source passes through: whatever a CSV file, a SQL statement or an Omada / midPoint
+  mapping calls its resource and context types. Those are exactly what the dynamic layer is for.
 
 ---
 
@@ -115,6 +115,8 @@ so a *new* ingest entity type cannot silently fall outside the model:
 | 5 | Every ingest field of a core entity is a column or a declared alias, with a compatible type | `SCHEMAS` fields | `ontology:check` |
 | 5 | Every column of every core table is described, with the same type; nothing described is missing; every `IN (…)` CHECK constraint equals the ontology's list | `information_schema.columns`, `pg_constraint` of a database migrated from scratch | contract test (`Contract Tests` job) |
 | 6 | No term declared twice or as two kinds, no conflicting annotations, no case-only clashes, no undeclared references, naming conventions | the ontology itself | `ontology:check` |
+| 4 | Crawler types: each type a crawler manifest declares in `emits` is a subclass of the right core class whose `ia:emittedBy` names that crawler; each `ia:emittedBy` names a crawler that still declares it; `ia:passthroughFrom` equals the manifests' `emits.open` | every `tools/crawlers/*/crawler.json` (read through `crawlerManifests.js`) | `ontology:check` |
+| — | Every type literal a crawler's sources write is in its manifest's `emits` | the crawler sources (and the demo dataset for the demo crawler) | `ontology/crawlerEmits.guard.test.js` (unit job) |
 | — | Every `contextType` literal a plugin writes is in its own `contextTypes` | the plugin sources | `contexts/plugins/contextTypes.guard.test.js` (unit job) |
 | — | Every example in `ontology/examples` fits the ontology: each resource a concrete core class, each property allowed on its class, each reference to a resource of the right class, each value from its closed list, each context's `targetType` allowed by its type, each edge row with both ends | the ontology itself | `ontology:check` |
 | — | Data-model diagrams in the docs are generated, validated or marked out of scope; the generated reference page is current | the docs | `ontology:check` |
@@ -140,6 +142,7 @@ ontology on 2026-10-19: none draws the data model, and the few model terms they 
 | `reference/core-model.md` — type hierarchy and relationship types | **generated** (`core-classes`) |
 | `concepts/ontology.md` — the five kinds of node and what connects them | **generated** (`core-overview`, a flowchart) |
 | `concepts/ontology.md` — the worked example | **generated** (`example-team`, from `ontology/examples/team.ttl`) |
+| `concepts/ontology.md` — principal, resource and context types by origin | **generated** (`types-principal`, `types-resource`, `types-context`) |
 | `concepts/data-model.md` — satellite tables (PrincipalActivity, RiskScores) | validated |
 | `concepts/governance-model.md` — Governance Entity Diagram | validated (its Resources / ResourceAssignments / ResourceRelationships attributes are checked against the ontology) |
 | `concepts/risk-scoring-model.md` — risk tables | out of scope |
@@ -228,7 +231,17 @@ Found while adding the context types (version 1.1.0). Again none of the behaviou
 12. **Deleting a generated node deletes the manual children under it.** `parentContextId` is
     `ON DELETE CASCADE`; the runner's header comment said manual children survive (corrected here).
 13. **Two spellings for an org unit.** The `ad-ou-from-dn` plugin writes `OrganisationalUnit`; the Omada,
-    CSV and midPoint crawlers write `OrgUnit`. Nothing branches on either today.
+    CSV and midPoint crawlers write `OrgUnit`. Nothing branches on either today. Both are now defined
+    (1.2.0), as the two different things they are: synced org units of persons, and OUs derived from
+    accounts' distinguished names.
+17. **The demo dataset types the Azure subscription `AzureScope`**, while the Azure RM crawler writes
+    `AzureSubscription` (and the demo never writes `AzureManagementGroup`), so the demo data looks
+    unlike a real Azure crawl.
+18. **Omada defines a resource-type map that is never applied.** `resourceTypeToIdentityAtlas` in
+    `Start-OmadaCrawler.ps1` is declared, but `ConvertTo-AtlasResourceType` is never called; resource
+    categories come from `resourceCategoryMapping` instead.
+19. **The CSV crawler scopes its principal reconcile to `principalType='User'`** even when its rows carry
+    other types.
 14. **Two "non-human account" lists.** `NON_HUMAN_PRINCIPAL_TYPES` (account linking) is ServicePrincipal,
     ManagedIdentity, AIAgent; `riskscoring/engine.js` keeps its own inline list that also includes
     WorkloadIdentity.

@@ -11,7 +11,8 @@
 //   - each ia:producedBy names a registered plugin that still declares the
 //     value (the reverse direction, so a renamed plugin type fails);
 //   - each value the code compares against is defined;
-//   - each defined context type is produced by a plugin or compared against —
+//   - each defined context type is produced by a plugin, written by a crawler
+//     (ia:emittedBy, checked in ./crawlers.js) or compared against —
 //     the ontology does not collect values nothing in the code knows about.
 
 import { typedSubclasses } from '../model.js';
@@ -66,8 +67,8 @@ function checkUsage(byValue, branchedOn) {
     if (!byValue.has(value)) out.push(err('context-type-undefined', `Context:${value}`, `the code compares against "${value}" (${where.join(', ')}) but it is not a subclass of ia:Context in the ontology`));
   }
   for (const cls of byValue.values()) {
-    if (cls.producedBy.length === 0 && !branchedOn.has(cls.typeValue)) {
-      out.push(err('context-type-unused', `ia:${cls.local}`, `"${cls.typeValue}" is neither emitted by a plugin nor compared against anywhere in the code`));
+    if (cls.producedBy.length === 0 && cls.emittedBy.length === 0 && !branchedOn.has(cls.typeValue)) {
+      out.push(err('context-type-unused', `ia:${cls.local}`, `"${cls.typeValue}" is neither emitted by a plugin or a crawler nor compared against anywhere in the code`));
     }
   }
   return out;

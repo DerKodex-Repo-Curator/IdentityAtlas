@@ -73,7 +73,7 @@ describe('renderReference — context types', () => {
 
   it('adds what a context type groups and what makes it', () => {
     expect(md).toContain('| Value | Class | Groups | Made by | Meaning |');
-    expect(md).toContain('| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Principal | `manager-hierarchy` | A team. |');
+    expect(md).toContain('| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Principal | plugin `manager-hierarchy` | A team. |');
     // Target types sorted, and a type no plugin emits is made by application code.
     expect(md).toContain('| `Tag` | `ia:TagContext` | Principal, Resource | application code | A label. |');
   });

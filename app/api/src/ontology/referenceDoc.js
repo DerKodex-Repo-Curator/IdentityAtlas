@@ -6,6 +6,7 @@ import { coreClassDiagram } from './mermaid.js';
 import {
   columnsOf, isSubClassOf, relationshipTypesOf, schemeMembers, tableClasses, typedSubclasses, valueSetFor,
 } from './model.js';
+import { originText } from './typeOrigins.js';
 
 const TTL_URL = 'https://github.com/Fortigi/IdentityAtlas/blob/main/ontology/core.ttl';
 const RAW_URL = 'https://raw.githubusercontent.com/Fortigi/IdentityAtlas/main/ontology/core.ttl';
@@ -53,14 +54,22 @@ function subclassSection(model, cls) {
     const parents = s.superClasses.filter(x => x !== cls.local).map(x => `ia:${x}`).join(', ');
     return [code(s.typeValue), code(`ia:${s.local}`), `${parents ? `(${parents}) ` : ''}${s.comment}`];
   });
-  // Context types also say what they group and what makes them.
+  const from = cls.passthroughFrom.map(code).join(', ');
+  let passthrough = [];
+  if (from && cls.openVocabulary) passthrough = [`Other values arrive from the source data or configuration of: ${from}.`, ''];
+  else if (from) passthrough = [`Mapped onto this list from the source data or configuration by: ${from}.`, ''];
+  const madeBy = (s) => originText(model, s, code);
+  // Context types also say what they group.
   if (subs.some(s => s.allowedTargetTypes.length)) {
     const groups = (s) => s.allowedTargetTypes.map(i => model.individuals.get(i)?.typeValue ?? i).join(', ');
-    const madeBy = (s) => (s.producedBy.length ? s.producedBy.map(code).join(', ') : 'application code');
     const wide = rows.map(([v, c, m], i) => [v, c, groups(subs[i]), madeBy(subs[i]), m]);
-    return [kind, '', ...table(['Value', 'Class', 'Groups', 'Made by', 'Meaning'], wide)];
+    return [kind, '', ...table(['Value', 'Class', 'Groups', 'Made by', 'Meaning'], wide), ...passthrough];
   }
-  return [kind, '', ...table(['Value', 'Class', 'Meaning'], rows)];
+  if (subs.some(s => s.emittedBy.length)) {
+    const wide = rows.map(([v, c, m], i) => [v, c, madeBy(subs[i]), m]);
+    return [kind, '', ...table(['Value', 'Class', 'Made by', 'Meaning'], wide), ...passthrough];
+  }
+  return [kind, '', ...table(['Value', 'Class', 'Meaning'], rows), ...passthrough];
 }
 
 function relationshipSection(model, cls) {
