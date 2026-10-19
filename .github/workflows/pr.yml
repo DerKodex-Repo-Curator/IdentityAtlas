@@ -222,6 +222,8 @@ jobs:
               - 'docs/**'
               - 'mkdocs.yml'
               - 'app/api/src/docs/**'
+              # docs/concepts/ontology.md quotes ontology/*.ttl verbatim.
+              - 'ontology/**'
             # Any source file the file-length / complexity ratchets measure, keyed
             # by extension. A docs-only / version-bump / baseline PR matches none
             # of these, so `code` is false and both ratchets skip (they re-measure

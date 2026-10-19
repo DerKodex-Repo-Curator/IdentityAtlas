@@ -82,7 +82,55 @@ export function coreClassDiagram(model) {
   return lines.join('\n');
 }
 
+// Node colours, readable in light and dark docs themes; the example picture
+// (example.js) uses the same palette.
+export const NODE_STYLE = {
+  Identity: 'fill:#7c3aed,stroke:#5b21b6,color:#fff',
+  Principal: 'fill:#2563eb,stroke:#1e40af,color:#fff',
+  Resource: 'fill:#059669,stroke:#047857,color:#fff',
+  Context: 'fill:#d97706,stroke:#b45309,color:#fff',
+  System: 'fill:#475569,stroke:#334155,color:#fff',
+};
+
+// One arrow per (from, to, label); an edge table may connect the same pair twice.
+function pushUnique(lines, seen, line) {
+  if (!seen.has(line)) { seen.add(line); lines.push(line); }
+}
+
+/**
+ * flowchart of the five kinds of node and what connects them: an edge table is
+ * a solid arrow from its source to its target (with the relationship types it
+ * stores), a foreign key between node tables a dotted one.
+ */
+// Every (source class, target class) pair an edge table connects, labelled with
+// the table and the relationship types it stores.
+function edgeTableArrows(model, edge) {
+  const ranges = (props) => props.flatMap(p => model.properties.get(p)?.rangeClasses ?? []);
+  const types = edge.typeColumn ? relationshipTypesOf(model, edge.local).map(r => r.typeValue).sort(byName) : [];
+  const text = types.length ? `${edge.table}<br/><small>${types.join(', ')}</small>` : edge.table;
+  return ranges(edge.sourceProperties).flatMap(from => ranges(edge.targetProperties).map(to => `    ${from} -->|"${text}"| ${to}`));
+}
+
+function foreignKeyArrows(model, node) {
+  const fks = columnsOf(model, node.local).filter(p => p.kind === 'object').sort((a, b) => byName(a.local, b.local));
+  return fks.flatMap(p => p.rangeClasses.map(to => `    ${node.local} -.->|"${p.local}"| ${to}`));
+}
+
+export function coreOverviewDiagram(model) {
+  const tables = tableClasses(model);
+  const nodes = tables.filter(c => !isSubClassOf(model, c.local, 'Edge')).sort((a, b) => byName(a.local, b.local));
+  const edges = tables.filter(c => isSubClassOf(model, c.local, 'Edge')).sort((a, b) => byName(a.table, b.table));
+  const lines = ['flowchart LR', ...nodes.map(n => `    ${n.local}["${n.label}<br/><small>${n.table}</small>"]:::${n.local}`)];
+  const seen = new Set();
+  for (const line of [...edges.flatMap(e => edgeTableArrows(model, e)), ...nodes.flatMap(n => foreignKeyArrows(model, n))]) {
+    pushUnique(lines, seen, line);
+  }
+  lines.push(...nodes.filter(n => NODE_STYLE[n.local]).map(n => `    classDef ${n.local} ${NODE_STYLE[n.local]}`));
+  return lines.join('\n');
+}
+
 export const GENERATED_DIAGRAMS = {
   'core-erd': coreErDiagram,
   'core-classes': coreClassDiagram,
+  'core-overview': coreOverviewDiagram,
 };

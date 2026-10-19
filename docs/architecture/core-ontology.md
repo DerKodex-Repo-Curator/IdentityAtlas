@@ -116,6 +116,7 @@ so a *new* ingest entity type cannot silently fall outside the model:
 | 5 | Every column of every core table is described, with the same type; nothing described is missing; every `IN (…)` CHECK constraint equals the ontology's list | `information_schema.columns`, `pg_constraint` of a database migrated from scratch | contract test (`Contract Tests` job) |
 | 6 | No term declared twice or as two kinds, no conflicting annotations, no case-only clashes, no undeclared references, naming conventions | the ontology itself | `ontology:check` |
 | — | Every `contextType` literal a plugin writes is in its own `contextTypes` | the plugin sources | `contexts/plugins/contextTypes.guard.test.js` (unit job) |
+| — | Every example in `ontology/examples` fits the ontology: each resource a concrete core class, each property allowed on its class, each reference to a resource of the right class, each value from its closed list, each context's `targetType` allowed by its type, each edge row with both ends | the ontology itself | `ontology:check` |
 | — | Data-model diagrams in the docs are generated, validated or marked out of scope; the generated reference page is current | the docs | `ontology:check` |
 
 **Not automated, deliberately:** whether a description is *right*; the prose type tables in
@@ -128,12 +129,17 @@ prompt and is the strongest candidate to be generated from the ontology next.
 ### Diagram inventory
 
 Only `erDiagram` and `classDiagram` can draw a data model, so only those are in scope; each must be
-generated, validated or explicitly out of scope (an unmarked one fails the check).
+generated, validated or explicitly out of scope (an unmarked one fails the check). A generated region
+is checked whatever its diagram type, so the flowcharts on [The Ontology, Visually](../concepts/ontology.md)
+are held to the same rule. The other flowcharts and graphs were reviewed by hand against the
+ontology on 2026-10-19: none draws the data model, and the few model terms they name are correct.
 
 | Diagram | Status |
 |---|---|
 | `concepts/data-model.md` — Entity Relationship Diagram | **generated** (`core-erd`) |
 | `reference/core-model.md` — type hierarchy and relationship types | **generated** (`core-classes`) |
+| `concepts/ontology.md` — the five kinds of node and what connects them | **generated** (`core-overview`, a flowchart) |
+| `concepts/ontology.md` — the worked example | **generated** (`example-team`, from `ontology/examples/team.ttl`) |
 | `concepts/data-model.md` — satellite tables (PrincipalActivity, RiskScores) | validated |
 | `concepts/governance-model.md` — Governance Entity Diagram | validated (its Resources / ResourceAssignments / ResourceRelationships attributes are checked against the ontology) |
 | `concepts/risk-scoring-model.md` — risk tables | out of scope |

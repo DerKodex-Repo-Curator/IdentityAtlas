@@ -2,15 +2,16 @@
 //
 //   check     parse /ontology/core.ttl, then run every deterministic check:
 //             integrity, agreement with the code's registries, known gaps,
-//             data-model diagrams in docs/, and freshness of the generated
-//             reference page. Exit 1 on any finding.
+//             the example data in /ontology/examples, data-model diagrams in
+//             docs/, and freshness of the generated reference page. Exit 1 on
+//             any finding.
 //   generate  rewrite docs/reference/core-model.md and every generated
 //             Mermaid region in docs/ from the ontology.
 //
 // The comparison with a real migrated database runs in the contract tests
 // (contract-tests/coreOntology.contract.test.js), which have PostgreSQL.
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { buildModel, parseOntology } from './model.js';
@@ -20,6 +21,7 @@ import { applyKnownGaps } from './checks/knownGaps.js';
 import { checkDiagrams, diagramInventory, renderGeneratedRegions } from './docsDiagrams.js';
 import { GENERATED_DIAGRAMS } from './mermaid.js';
 import { renderReference } from './referenceDoc.js';
+import { checkExample, exampleDiagram, readInstances } from './example.js';
 import { loadRegistry } from './registry.js';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -27,6 +29,7 @@ export const PATHS = {
   ontology: 'ontology/core.ttl',
   config: 'ontology/validation.json',
   reference: 'docs/reference/core-model.md',
+  examples: 'ontology/examples',
   docs: 'docs',
 };
 
@@ -53,9 +56,37 @@ export function loadConfig(root = REPO_ROOT) {
   return JSON.parse(read(root, PATHS.config));
 }
 
-function docsFindings(root, model) {
+/**
+ * Parse every example in ontology/examples. Returns [{ name, path, instances }]
+ * and the parse errors (an example with a syntax error is reported, not used).
+ */
+export function loadExamples(root = REPO_ROOT) {
+  const examples = [];
+  const errors = [];
+  if (!existsSync(join(root, PATHS.examples))) return { examples, errors };
+  for (const file of readdirSync(join(root, PATHS.examples)).filter(n => n.endsWith('.ttl')).sort()) {
+    const path = `${PATHS.examples}/${file}`;
+    const parsed = parseOntology(read(root, path), path);
+    if (parsed.errors) errors.push(...parsed.errors);
+    else examples.push({ name: file.replace(/.ttl$/, ''), path, instances: readInstances(parsed.store) });
+  }
+  return { examples, errors };
+}
+
+/** The diagram generators: the model ones plus one picture per example (example-<name>). */
+export function diagramGenerators(examples) {
+  const gens = { ...GENERATED_DIAGRAMS };
+  for (const ex of examples) gens[`example-${ex.name}`] = (model) => exampleDiagram(model, ex.instances);
+  return gens;
+}
+
+function exampleFindings(model, loaded) {
+  return [...loaded.errors, ...loaded.examples.flatMap(ex => checkExample(model, ex.instances, ex.path))];
+}
+
+function docsFindings(root, model, generators) {
   const files = markdownFiles(root).map(path => ({ path, text: read(root, path) }));
-  const out = checkDiagrams(files, model, GENERATED_DIAGRAMS);
+  const out = checkDiagrams(files, model, generators);
   const expected = renderReference(model);
   const committed = files.find(f => f.path === PATHS.reference)?.text;
   if (committed !== expected) {
@@ -73,10 +104,12 @@ export function runCheck({ root = REPO_ROOT, registry = loadRegistry() } = {}) {
   const loaded = loadOntology(root);
   if (loaded.errors) return { errors: loaded.errors, accepted: [], inventory: [] };
   const config = loadConfig(root);
-  const { findings, inventory } = docsFindings(root, loaded.model);
+  const examples = loadExamples(root);
+  const { findings, inventory } = docsFindings(root, loaded.model, diagramGenerators(examples.examples));
   const all = [
     ...checkIntegrity(loaded.model),
     ...checkImplementation(loaded.model, registry, config),
+    ...exampleFindings(loaded.model, examples),
     ...findings,
   ];
   return { ...applyKnownGaps(all, config.knownGaps, 'static'), inventory };
@@ -93,9 +126,11 @@ export function runGenerate({ root = REPO_ROOT } = {}) {
     if (before !== text) { writeFileSync(join(root, rel), text); changed.push(rel); }
   };
   write(PATHS.reference, renderReference(loaded.model));
-  const errors = [];
+  const examples = loadExamples(root);
+  const generators = diagramGenerators(examples.examples);
+  const errors = [...examples.errors];
   for (const rel of markdownFiles(root).filter(p => p !== PATHS.reference)) {
-    const { text, unknown } = renderGeneratedRegions(read(root, rel), loaded.model, GENERATED_DIAGRAMS);
+    const { text, unknown } = renderGeneratedRegions(read(root, rel), loaded.model, generators);
     for (const id of unknown) errors.push({ code: 'diagram-unknown-generator', subject: rel, message: `no generator named "${id}" (or its END marker is missing)` });
     write(rel, text);
   }

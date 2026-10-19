@@ -89,7 +89,7 @@ Migration files are numbered sequentially (`001_core_schema.sql`, `002_governanc
 | `routes/identities.js` | Identities + linked accounts; per-account analyst override management (confirm/reject/clear) |
 | `routes/accountLinking.js` | Account-linking config + run endpoints |
 | `routes/riskScores.js` | Risk score reading + analyst override endpoints |
-| `routes/contexts.js` | Contexts CRUD, member management, plugin runner |
+| `routes/contexts/` | Contexts CRUD and member management (`routes/contextPlugins.js` runs the plugins) |
 | `routes/reports.js` | Report listing + running. Generic: `:name` is a registry lookup into `src/reports/` and the response carries whatever `form`/`columns` the template declared — **never branch on a report name here** (a guard test fails the PR if you do). Adding a report is a template file plus one line in `src/reports/templates/index.js`; see [`docs/architecture/reports.md`](../../docs/architecture/reports.md) |
 | `routes/jobs.js` | Crawler config CRUD, job queuing, manifest-driven job type discovery |
 | `routes/perf.js` | Performance metrics API |

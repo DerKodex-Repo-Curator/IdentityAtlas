@@ -125,6 +125,23 @@ ia:ManagerHierarchyContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeVal
     ia:producedBy "manager-hierarchy" ; ia:allowedTargetType ia:EntityKind_Principal ; ${d('Manager node', 'A team.')} .
 ia:TagContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "Tag" ;
     ia:allowedTargetType ia:EntityKind_Principal, ia:EntityKind_Resource ; ${d('Tag', 'A label.')} .
+ia:targetType a owl:DatatypeProperty ; ia:sqlType "text" ; ia:valueScheme ia:EntityKind ;
+    rdfs:domain ia:Context ; rdfs:range xsd:string ; ${d('targetType', 'What it groups.')} .
+ia:parentContextId a owl:ObjectProperty ; ia:sqlType "uuid" ; rdfs:domain ia:Context ; rdfs:range ia:Context ; ${d('parentContextId', 'Parent.')} .
+`;
+
+/** Example instance data that is valid against CONTEXT_TTL; examplesOf() parses it. */
+export const EXAMPLE_TTL = `
+@prefix ia: <https://identityatlas.io/ontology#> .
+@prefix ex: <https://identityatlas.io/example#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+ex:src a ia:System ; ia:displayName "Src" .
+ex:acct a ia:User ; ia:displayName "acct" ; ia:systemId ex:src .
+ex:grp a ia:Group ; ia:displayName "Grp" ; ia:systemId ex:src ; ia:hasOwnership ex:own .
+ex:own a ia:GroupOwnership ; ia:displayName "Owners of Grp" ; rdfs:label "a label is fine" .
+ex:a1 a ia:ResourceAssignment ; ia:principalId ex:acct ; ia:resourceId ex:grp ; ia:assignmentType "Direct" .
+ex:root a ia:ManagerHierarchyContext ; ia:targetType "Principal" .
+ex:team a ia:ManagerHierarchyContext ; ia:targetType "Principal" ; ia:parentContextId ex:root .
 `;
 
 /** miniRegistry() plus the context half that agrees with CONTEXT_TTL. */

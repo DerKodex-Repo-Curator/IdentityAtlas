@@ -12,9 +12,11 @@
 //   <!-- ontology: out-of-scope — <reason> -->
 //        not the core model (crawler credentials, risk tables, …)
 //
-// Sequence, flow, state and gantt diagrams are not data models and are never
-// checked. An unmarked erDiagram / classDiagram fails, so a new data-model
-// diagram cannot slip in unexamined.
+// Sequence, flow, state and gantt diagrams are not data models and are not
+// checked — unless they sit in a generated region (the overview and example
+// pictures are flowcharts): a generated block of any type must be current. An
+// unmarked erDiagram / classDiagram fails, so a new data-model diagram cannot
+// slip in unexamined.
 
 import { columnsOf, tableClasses } from './model.js';
 
@@ -131,7 +133,7 @@ function checkBlock(model, generators, block, subject) {
 export function checkDiagrams(files, model, generators) {
   const out = [];
   for (const { path, text } of files) {
-    for (const block of extractMermaidBlocks(text).filter(b => MODEL_KINDS.has(b.kind))) {
+    for (const block of extractMermaidBlocks(text).filter(b => MODEL_KINDS.has(b.kind) || b.marker === 'generated')) {
       out.push(...checkBlock(model, generators, block, `${path}:${block.line}`));
     }
   }
@@ -142,6 +144,6 @@ export function checkDiagrams(files, model, generators) {
 export function diagramInventory(files) {
   return files.flatMap(({ path, text }) => extractMermaidBlocks(text).map(b => ({
     path, line: b.line, kind: b.kind,
-    classification: MODEL_KINDS.has(b.kind) ? (b.marker ?? 'unclassified') : 'out-of-scope (not a data-model diagram type)',
+    classification: MODEL_KINDS.has(b.kind) || b.marker === 'generated' ? (b.marker ?? 'unclassified') : 'out-of-scope (not a data-model diagram type)',
   })));
 }

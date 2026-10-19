@@ -80,6 +80,16 @@ the core when the application itself gives it a meaning:
 
 A defined context type that no plugin emits and no code compares against fails as `context-type-unused`.
 
+### An example
+
+`ontology/examples/*.ttl` holds small, fictional data sets written with the ontology's terms — what
+the model looks like with rows in it. `ontology:check` validates each one (every resource a core
+class, every property allowed on it, every reference to the right class, every value from its list)
+and `ontology:generate` draws it into any `<!-- BEGIN GENERATED: ontology example-<file name> -->`
+region. [The Ontology, Visually](../concepts/ontology.md) shows `team.ttl` this way and quotes the
+file itself through `pymdownx.snippets`, as it quotes the excerpts of `core.ttl` marked with
+`# --8<-- [start:…]` / `[end:…]` comment lines. Keep those markers around the term when you edit it.
+
 ### A new column
 
 Add a property named exactly like the column, with `ia:sqlType` set to the type
@@ -135,6 +145,7 @@ only shrinks: an entry that no longer matches a finding fails as `stale-known-ga
 | `context-target-type-missing`, `context-target-type-invalid`, `context-annotation-misplaced` | a context type's annotations are incomplete or misplaced |
 | `conflicting-declaration`, `conflicting-annotation`, `duplicate-identifier`, `duplicate-type-value`, `undeclared-term`, `undeclared-reference`, `naming-convention` | the ontology contradicts itself |
 | `db-column-undescribed`, `db-column-missing`, `db-column-type`, `db-check-mismatch`, `db-check-not-in-ontology` | the migrated database differs (contract test) |
+| `example-type`, `example-property`, `example-domain`, `example-range`, `example-dangling`, `example-value`, `example-target-type`, `example-edge-ends`, `example-empty` | an example in `ontology/examples` does not fit the ontology |
 | `diagram-unclassified`, `diagram-stale`, `diagram-unknown-attribute`, `reference-stale` | the docs differ |
 | `stale-known-gap`, `stale-out-of-scope` | `validation.json` lists something that no longer happens |
 

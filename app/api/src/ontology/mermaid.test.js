@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { coreClassDiagram, coreErDiagram, GENERATED_DIAGRAMS } from './mermaid.js';
-import { modelOf } from './__tests__/miniOntology.js';
+import { coreClassDiagram, coreErDiagram, coreOverviewDiagram, GENERATED_DIAGRAMS } from './mermaid.js';
+import { MINI_TTL, edit, modelOf } from './__tests__/miniOntology.js';
 
 describe('coreErDiagram', () => {
   const er = coreErDiagram(modelOf());
@@ -64,6 +64,41 @@ describe('coreClassDiagram', () => {
   });
 });
 
-it('registers both generators by id', () => {
-  expect(Object.keys(GENERATED_DIAGRAMS).sort()).toEqual(['core-classes', 'core-erd']);
+it('registers the model generators by id', () => {
+  expect(Object.keys(GENERATED_DIAGRAMS).sort()).toEqual(['core-classes', 'core-erd', 'core-overview']);
+});
+
+describe('coreOverviewDiagram', () => {
+  it('draws the node tables, an arrow per edge table with its relationship types, and dotted foreign keys', () => {
+    expect(coreOverviewDiagram(modelOf())).toBe([
+      'flowchart LR',
+      '    Principal["Principal<br/><small>Principals</small>"]:::Principal',
+      '    Resource["Resource<br/><small>Resources</small>"]:::Resource',
+      '    System["System<br/><small>Systems</small>"]:::System',
+      '    Principal -->|"ResourceAssignments"| Resource',
+      '    Resource -->|"ResourceRelationships<br/><small>Contains, HasOwnership</small>"| Resource',
+      '    Principal -.->|"systemId"| System',
+      '    Resource -.->|"systemId"| System',
+      '    classDef Principal fill:#2563eb,stroke:#1e40af,color:#fff',
+      '    classDef Resource fill:#059669,stroke:#047857,color:#fff',
+      '    classDef System fill:#475569,stroke:#334155,color:#fff',
+    ].join('\n'));
+  });
+
+  it('draws one arrow per pair even when an edge table names the same end twice', () => {
+    const ttl = edit(MINI_TTL, 'ia:sourceProperty ia:principalId ;', 'ia:sourceProperty ia:principalId, ia:principalId ;');
+    expect(coreOverviewDiagram(modelOf(ttl)).split('\n').filter(l => l.includes('ResourceAssignments'))).toHaveLength(1);
+  });
+
+  it('draws no arrow for an edge end that names an undeclared property', () => {
+    const ttl = edit(MINI_TTL, 'ia:sourceProperty ia:principalId ;', 'ia:sourceProperty ia:missingId ;');
+    expect(coreOverviewDiagram(modelOf(ttl))).not.toContain('ResourceAssignments');
+  });
+
+  it('leaves a node without a known colour unstyled', () => {
+    const ttl = `${MINI_TTL}\nia:Thing a owl:Class ; rdfs:subClassOf ia:Node ; rdfs:label "Thing" ; ia:table "Things" .`;
+    const out = coreOverviewDiagram(modelOf(ttl));
+    expect(out).toContain('    Thing["Thing<br/><small>Things</small>"]:::Thing');
+    expect(out).not.toContain('classDef Thing');
+  });
 });

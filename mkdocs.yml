@@ -55,6 +55,11 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
+  # Quote repository files verbatim (docs/concepts/ontology.md shows ontology/*.ttl),
+  # so an excerpt cannot drift from its source. A missing file fails the build.
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.emoji:
@@ -96,6 +101,7 @@ nav:
   - Learn:
       - The model:
           - Data Model: concepts/data-model.md
+          - The Ontology, Visually: concepts/ontology.md
           - Governance & Business Roles: concepts/governance-model.md
           - One Person, Many Accounts: architecture/account-linking.md
       - Risk scoring:

@@ -85,6 +85,36 @@ describe('against a scratch copy of the repository files', () => {
     expect(runGenerate({ root }).changed).toEqual([]);
   });
 
+  describe('examples', () => {
+    const exampleDir = () => join(root, PATHS.examples);
+    beforeEach(() => mkdirSync(exampleDir()));
+
+    it('validates each example and generates its picture as example-<name>', () => {
+      cpSync(join(REPO_ROOT, PATHS.examples, 'team.ttl'), join(exampleDir(), 'team.ttl'));
+      writeFileSync(join(root, 'docs', 'pic.md'), ['<!-- BEGIN GENERATED: ontology example-team -->', '<!-- END GENERATED: ontology example-team -->', ''].join('\n'));
+      expect(runGenerate({ root }).errors).toEqual([]);
+      expect(readFileSync(join(root, 'docs', 'pic.md'), 'utf8')).toContain('```mermaid\nflowchart LR\n');
+      expect(runCheck({ root }).errors).toEqual([]);
+      // The picture is checked like any generated diagram, flowchart or not.
+      writeFileSync(join(root, 'docs', 'pic.md'), ['<!-- BEGIN GENERATED: ontology example-team -->', '```mermaid', 'flowchart LR', '```', '<!-- END GENERATED: ontology example-team -->'].join('\n'));
+      expect(runCheck({ root }).errors.map(e => `${e.code} ${e.subject}`)).toEqual(['diagram-stale docs/pic.md:2']);
+    });
+
+    it('fails the check for an example that breaks the model', () => {
+      runGenerate({ root });
+      writeFileSync(join(exampleDir(), 'bad.ttl'), '@prefix ia: <https://identityatlas.io/ontology#> .\n@prefix ex: <https://identityatlas.io/example#> .\nex:a a ia:User ; ia:assignmentType "Direct" .\n');
+      expect(runCheck({ root }).errors.map(e => `${e.code} ${e.subject}`)).toEqual(['example-domain example:a']);
+    });
+
+    it('reports an example that is not valid Turtle, and ignores non-Turtle files', () => {
+      runGenerate({ root });
+      writeFileSync(join(exampleDir(), 'README.md'), 'not an example');
+      writeFileSync(join(exampleDir(), 'broken.ttl'), 'ex:a a');
+      expect(runCheck({ root }).errors.map(e => `${e.code} ${e.subject}`)).toEqual([`syntax ${PATHS.examples}/broken.ttl`]);
+      expect(runGenerate({ root }).errors.map(e => e.code)).toEqual(['syntax']);
+    });
+  });
+
   it('generate fails on a region with no generator', () => {
     writeFileSync(join(root, 'docs', 'other.md'), ['<!-- BEGIN GENERATED: ontology nope -->', '<!-- END GENERATED: ontology nope -->'].join('\n'));
     const { io, out } = capture();

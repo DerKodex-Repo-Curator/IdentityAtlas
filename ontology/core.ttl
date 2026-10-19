@@ -25,6 +25,8 @@
 #   * Every term is rdfs:isDefinedBy <https://identityatlas.io/ontology>. Future
 #     runtime-defined extensions live in their own ontology and namespace and
 #     never add triples about core terms' definitions (docs/architecture/core-ontology.md).
+#   * The scissors comment lines (start / end markers) mark excerpts that
+#     docs/concepts/ontology.md quotes verbatim (pymdownx.snippets).
 
 @prefix ia:      <https://identityatlas.io/ontology#> .
 @prefix owl:     <http://www.w3.org/2002/07/owl#> .
@@ -125,11 +127,13 @@ ia:System a owl:Class ; rdfs:subClassOf ia:Node ;
     rdfs:comment "A connected authorization source (Entra ID, Omada, a SQL database, a CSV feed …). Principals, resources and synced contexts belong to one system." ;
     ia:table "Systems" ; ia:identifierColumn "id" ; ia:identifierSqlType "integer" ; ia:ingestEntity "systems" .
 
+# --8<-- [start:principal]
 ia:Principal a owl:Class ; rdfs:subClassOf ia:Node ;
     rdfs:label "Principal" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "An account in a source system: a user, service principal, managed identity, AI agent, guest, shared mailbox …" ;
     ia:table "Principals" ; ia:identifierColumn "id" ; ia:identifierSqlType "uuid" ; ia:ingestEntity "principals" ;
     ia:discriminator "principalType" .
+# --8<-- [end:principal]
 
 ia:Resource a owl:Class ; rdfs:subClassOf ia:Node ;
     rdfs:label "Resource" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
@@ -197,9 +201,11 @@ ia:ManagedIdentity a owl:Class ; rdfs:subClassOf ia:Principal ; ia:typeValue "Ma
 ia:WorkloadIdentity a owl:Class ; rdfs:subClassOf ia:Principal ; ia:typeValue "WorkloadIdentity" ;
     rdfs:label "Workload identity" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "A federated-credential identity used by a workload (a pipeline, a Kubernetes service account). Accepted from CSV, SQL, SCIM and midPoint sources; the Entra crawler deliberately does not classify accounts this way." .
+# --8<-- [start:ai-agent]
 ia:AIAgent a owl:Class ; rdfs:subClassOf ia:Principal ; ia:typeValue "AIAgent" ;
     rdfs:label "AI agent" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "An AI agent (Copilot Studio, Azure OpenAI, a custom bot) that holds access as its own account." .
+# --8<-- [end:ai-agent]
 ia:ExternalUser a owl:Class ; rdfs:subClassOf ia:Principal ; ia:typeValue "ExternalUser" ;
     rdfs:label "External user" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "A guest / B2B account from another organisation." .
@@ -248,6 +254,7 @@ ia:ResourceOwnership a owl:Class ; rdfs:subClassOf ia:OwnershipResource ; ia:typ
 
 # ─── Closed value lists ───────────────────────────────────────────────────────
 
+# --8<-- [start:assignment-type]
 ia:AssignmentType a owl:Class ;
     rdfs:label "Assignment type" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "How an assignment is held. Only these three values exist; ownership, governance and source detail are modelled elsewhere." .
@@ -260,6 +267,7 @@ ia:AssignmentType_Indirect a owl:NamedIndividual, ia:AssignmentType ; ia:typeVal
 ia:AssignmentType_Eligible a owl:NamedIndividual, ia:AssignmentType ; ia:typeValue "Eligible" ;
     rdfs:label "Eligible" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "Granted but not active (PIM-eligible): can be activated." .
+# --8<-- [end:assignment-type]
 
 ia:AssignmentOrigin a owl:Class ;
     rdfs:label "Assignment origin" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
@@ -352,10 +360,12 @@ ia:MembershipSource_analyst a owl:NamedIndividual, ia:MembershipSource ; ia:type
 # plugin's name, checked against its `contextTypes`) and what routes and screens
 # compare against. ia:allowedTargetType: the kind of entity such a context groups.
 
+# --8<-- [start:manager-hierarchy]
 ia:ManagerHierarchyContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "ManagerHierarchy" ;
     ia:producedBy "manager-hierarchy" ; ia:allowedTargetType ia:EntityKind_Principal ;
     rdfs:label "Manager hierarchy node" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "One generated context per manager of one system's accounts, plus a synthetic root (externalId 'root'). The manager is recorded only in externalId, which holds the manager's Principal id — there is no manager column or member role. Members are the manager's direct reports (Principals.managerId, overridden per account by ManagerHierarchyOverrides); the manager is a member of their own manager's node, not of their own. parentContextId is the node of the manager's own manager, else the root. Accounts with no manager that manage nobody are members of the root; a top-level manager is a member of no node. A managerId that points at no account of the system still becomes a node, named 'Unknown'. A reporting cycle, a self-reference included, leaves a node without a parent: the runner refuses the link that would close the cycle." .
+# --8<-- [end:manager-hierarchy]
 ia:OrganisationalUnitContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "OrganisationalUnit" ;
     ia:producedBy "ad-ou-from-dn" ; ia:allowedTargetType ia:EntityKind_Principal ;
     rdfs:label "Organisational unit (from DN)" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
@@ -453,10 +463,12 @@ ia:grantsAccessTo a owl:ObjectProperty ; ia:typeValue "GrantsAccessTo" ; ia:stor
     rdfs:domain ia:Resource ; rdfs:range ia:Resource ;
     rdfs:label "grants access to" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "Holding the parent implies access to the child. Emitted by the CSV and SQL connectors and the demo dataset; no built-in crawler uses it." .
+# --8<-- [start:has-app-role]
 ia:hasAppRole a owl:ObjectProperty ; ia:typeValue "HasAppRole" ; ia:storedIn ia:ResourceRelationship ;
     rdfs:domain ia:Application ; rdfs:range ia:AppRole ;
     rdfs:label "has app role" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "An application and one of its app roles." .
+# --8<-- [end:has-app-role]
 ia:delegatesScope a owl:ObjectProperty ; ia:typeValue "DelegatesScope" ; ia:storedIn ia:ResourceRelationship ;
     rdfs:domain ia:Application ; rdfs:range ia:DelegatedPermission ;
     rdfs:label "delegates scope" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
