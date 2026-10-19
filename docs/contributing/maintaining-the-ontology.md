@@ -65,6 +65,21 @@ the core. Only when *application code* starts to branch on a value — it appear
 list the registry reads — add a subclass of `ia:Resource` (or of `ia:OwnershipResource` for an
 ownership type) with `ia:typeValue`.
 
+### A context type
+
+`contextType` is an open vocabulary too: a crawler or an analyst may store any value. Define one in
+the core when the application itself gives it a meaning:
+
+- **A plugin emits it.** List it in the plugin's `contextTypes` (`app/api/src/contexts/plugins/types.js`)
+  and add a subclass of `ia:Context` named `<Value>Context`, with `ia:typeValue`, `ia:producedBy "<plugin
+  name>"` and one `ia:allowedTargetType` per kind of entity it may group (`ia:EntityKind_Principal`, …).
+  `contextTypes.guard.test.js` fails when a plugin writes a `contextType: '…'` literal it does not declare.
+- **Code compares against it** (`"contextType" = 'Tag'` in SQL, `contextType === 'ManagerHierarchy'`
+  in JavaScript, in `app/api/src` or `app/ui/src`). Add the subclass without `ia:producedBy`. The scan is
+  `app/api/src/ontology/contextTypeUsage.js`; a value built at run time is not found by it.
+
+A defined context type that no plugin emits and no code compares against fails as `context-type-unused`.
+
 ### A new column
 
 Add a property named exactly like the column, with `ia:sqlType` set to the type
@@ -116,6 +131,8 @@ only shrinks: an entry that no longer matches a finding fails as `stale-known-ga
 | `ingest-entity-unclassified` | a new ingest entity type is neither a class nor out of scope |
 | `registry-type-undefined`, `ownership-*` | a code-side type list names a type the ontology lacks |
 | `relationship-endpoint-mismatch`, `polymorphic-target-mismatch`, `fk-type-mismatch` | a relationship does not fit its edge table |
+| `context-type-undefined`, `context-type-unused`, `context-producer-*`, `context-target-type-mismatch`, `plugin-context-types-undeclared` | context types differ between the plugins, the code and the ontology |
+| `context-target-type-missing`, `context-target-type-invalid`, `context-annotation-misplaced` | a context type's annotations are incomplete or misplaced |
 | `conflicting-declaration`, `conflicting-annotation`, `duplicate-identifier`, `duplicate-type-value`, `undeclared-term`, `undeclared-reference`, `naming-convention` | the ontology contradicts itself |
 | `db-column-undescribed`, `db-column-missing`, `db-column-type`, `db-check-mismatch`, `db-check-not-in-ontology` | the migrated database differs (contract test) |
 | `diagram-unclassified`, `diagram-stale`, `diagram-unknown-attribute`, `reference-stale` | the docs differ |

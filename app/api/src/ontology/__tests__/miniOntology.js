@@ -110,3 +110,30 @@ export function edit(ttl, from, to) {
   if (!ttl.includes(from)) throw new Error(`fixture does not contain: ${from}`);
   return ttl.replace(from, to);
 }
+
+// Context types on top of the mini ontology: one plugin-produced type and one
+// the code only compares against. Kept apart from MINI_TTL so the other checks'
+// fixtures stay minimal; contextRegistry() is the registry half that agrees.
+export const CONTEXT_TTL = `${MINI_TTL}
+ia:producedBy a owl:AnnotationProperty . ia:allowedTargetType a owl:AnnotationProperty .
+ia:Context a owl:Class ; rdfs:subClassOf ia:Node ; ${d('Context', 'A grouping.')} ;
+    ia:table "Contexts" ; ia:identifierColumn "id" ; ia:identifierSqlType "uuid" ; ia:discriminator "contextType" ; ia:openVocabulary true .
+ia:EntityKind a owl:Class ; ${d('Entity kind', 'What a context groups.')} .
+ia:EntityKind_Principal a owl:NamedIndividual, ia:EntityKind ; ia:typeValue "Principal" ; ${d('Principal', 'Accounts.')} .
+ia:EntityKind_Resource a owl:NamedIndividual, ia:EntityKind ; ia:typeValue "Resource" ; ${d('Resource', 'Resources.')} .
+ia:ManagerHierarchyContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "ManagerHierarchy" ;
+    ia:producedBy "manager-hierarchy" ; ia:allowedTargetType ia:EntityKind_Principal ; ${d('Manager node', 'A team.')} .
+ia:TagContext a owl:Class ; rdfs:subClassOf ia:Context ; ia:typeValue "Tag" ;
+    ia:allowedTargetType ia:EntityKind_Principal, ia:EntityKind_Resource ; ${d('Tag', 'A label.')} .
+`;
+
+/** miniRegistry() plus the context half that agrees with CONTEXT_TTL. */
+export function contextRegistry() {
+  return {
+    ...miniRegistry(),
+    contexts: {
+      plugins: [{ name: 'manager-hierarchy', targetType: 'Principal', contextTypes: ['ManagerHierarchy'] }],
+      branchedOn: new Map([['Tag', ['routes/tags.js:1']], ['ManagerHierarchy', ['routes/orgChart.js:9']]]),
+    },
+  };
+}

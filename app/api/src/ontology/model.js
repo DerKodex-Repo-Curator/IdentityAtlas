@@ -85,6 +85,9 @@ function buildClass(store, iri) {
     sourceProperties: locals(values(store, iri, ia('sourceProperty'))),
     targetProperties: locals(values(store, iri, ia('targetProperty'))),
     typeValue: first(store, iri, ia('typeValue')),
+    // Sorted: the store's order is an implementation detail, the docs must be stable.
+    producedBy: values(store, iri, ia('producedBy')).sort(),
+    allowedTargetTypes: locals(values(store, iri, ia('allowedTargetType'))).sort(),
   };
 }
 

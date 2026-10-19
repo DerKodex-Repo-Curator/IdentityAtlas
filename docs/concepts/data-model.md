@@ -76,6 +76,7 @@ erDiagram
     }
     Contexts {
         uuid id PK
+        string contextType "open vocabulary"
         string displayName
         uuid parentContextId FK
         int scopeSystemId FK

@@ -182,6 +182,7 @@ A plugin is a registered algorithm that takes parameters, reads from the databas
 export interface ContextPlugin {
   name: string;                    // matches ContextAlgorithms.name
   targetType: 'Identity'|'Resource'|'Principal'|'System';
+  contextTypes: string[];          // every contextType the plugin can emit
   parametersSchema: object;        // JSON Schema
   run(params, ctx): Promise<{
     contexts: Array<ContextNode>,  // tree by parentExternalId
@@ -190,7 +191,9 @@ export interface ContextPlugin {
 }
 ```
 
-The runner reconciles the plugin output with existing `Contexts` rows where `sourceAlgorithmId` matches: insert new, update changed, delete missing. Manual children grafted under a generated parent are preserved by `parentContextId`.
+The runner reconciles the plugin output with existing `Contexts` rows where `sourceAlgorithmId` matches: insert new, update changed, delete missing. Manual children grafted under a generated parent are preserved by `parentContextId` — as long as the parent itself survives: `parentContextId` is `ON DELETE CASCADE`, so when a re-run drops a generated node, the manual or analyst-reparented children still under it are deleted with it.
+
+Each `contextTypes` value is a subclass of `ia:Context` in the [core ontology](core-ontology.md) whose `ia:producedBy` names the plugin and whose `ia:allowedTargetType` admits the plugin's `targetType`. `npm run ontology:check` compares the two in both directions; `contextTypes.guard.test.js` checks that the list is complete against the literals in the plugin sources. A new plugin, or a new type in an existing one, therefore needs an ontology entry — see [Maintaining the Core Ontology](../contributing/maintaining-the-ontology.md#a-context-type).
 
 ### 4.2 Initial plugin set
 

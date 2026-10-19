@@ -53,6 +53,13 @@ function subclassSection(model, cls) {
     const parents = s.superClasses.filter(x => x !== cls.local).map(x => `ia:${x}`).join(', ');
     return [code(s.typeValue), code(`ia:${s.local}`), `${parents ? `(${parents}) ` : ''}${s.comment}`];
   });
+  // Context types also say what they group and what makes them.
+  if (subs.some(s => s.allowedTargetTypes.length)) {
+    const groups = (s) => s.allowedTargetTypes.map(i => model.individuals.get(i)?.typeValue ?? i).join(', ');
+    const madeBy = (s) => (s.producedBy.length ? s.producedBy.map(code).join(', ') : 'application code');
+    const wide = rows.map(([v, c, m], i) => [v, c, groups(subs[i]), madeBy(subs[i]), m]);
+    return [kind, '', ...table(['Value', 'Class', 'Groups', 'Made by', 'Meaning'], wide)];
+  }
   return [kind, '', ...table(['Value', 'Class', 'Meaning'], rows)];
 }
 

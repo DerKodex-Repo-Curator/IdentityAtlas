@@ -12,6 +12,8 @@ import { OWNERSHIP_RESOURCE_TYPES, OWNERSHIP_RELATIONSHIP_TYPES } from '../lib/o
 import { HIDDEN_BY_DEFAULT_RESOURCE_TYPES } from '../lib/resourceVisibility.js';
 import { GROUP_RESOURCE_TYPES } from '../effectiveAccess/engine.js';
 import { NON_HUMAN_PRINCIPAL_TYPES } from '../accountlinking/orphanQuery.js';
+import { REGISTERED_PLUGINS } from '../contexts/plugins/registry.js';
+import { scanContextTypeUsage } from './contextTypeUsage.js';
 
 /**
  * Snapshot of every code-side registry the ontology must agree with.
@@ -21,6 +23,9 @@ import { NON_HUMAN_PRINCIPAL_TYPES } from '../accountlinking/orphanQuery.js';
  *   principalTypeLists— principalType values the application branches on
  *   ownership         — the ownership resource types and the relationship
  *                       types that point at them
+ *   contexts          — what each context-algorithm plugin emits (name,
+ *                       targetType, contextTypes), and the contextType values
+ *                       the rest of the code compares against, with where
  */
 export function loadRegistry() {
   const ingest = {};
@@ -40,6 +45,10 @@ export function loadRegistry() {
     ownership: {
       resourceTypes: OWNERSHIP_RESOURCE_TYPES,
       relationshipTypes: OWNERSHIP_RELATIONSHIP_TYPES,
+    },
+    contexts: {
+      plugins: REGISTERED_PLUGINS.map(p => ({ name: p.name, targetType: p.targetType, contextTypes: p.contextTypes })),
+      branchedOn: scanContextTypeUsage(),
     },
   };
 }

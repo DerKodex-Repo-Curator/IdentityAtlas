@@ -211,6 +211,27 @@ function checkEdges(model) {
   return out;
 }
 
+// Context-type annotations: only on subclasses of ia:Context, and every typed
+// context class says which kind of entity it groups — a context has one member
+// type, so ia:allowedTargetType names ia:EntityKind values.
+function checkContextClasses(model) {
+  const out = [];
+  for (const c of model.classes.values()) {
+    const s = `ia:${c.local}`;
+    const isContext = c.local !== 'Context' && isSubClassOf(model, c.local, 'Context');
+    if (!isContext && (c.producedBy.length || c.allowedTargetTypes.length)) {
+      out.push(err('context-annotation-misplaced', s, 'ia:producedBy / ia:allowedTargetType belong on subclasses of ia:Context only'));
+      continue;
+    }
+    if (!isContext || !c.typeValue) continue;
+    if (c.allowedTargetTypes.length === 0) out.push(err('context-target-type-missing', s, 'a context type needs at least one ia:allowedTargetType'));
+    for (const t of c.allowedTargetTypes) {
+      if (!model.individuals.get(t)?.types.includes('EntityKind')) out.push(err('context-target-type-invalid', s, `ia:allowedTargetType ia:${t} is not an ia:EntityKind value`));
+    }
+  }
+  return out;
+}
+
 /** All structural checks. Returns a list of { code, subject, message }. */
 export function checkIntegrity(model) {
   return [
@@ -223,5 +244,6 @@ export function checkIntegrity(model) {
     ...checkTypeValues(model),
     ...checkIndividuals(model),
     ...checkEdges(model),
+    ...checkContextClasses(model),
   ];
 }

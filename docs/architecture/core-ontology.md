@@ -62,6 +62,7 @@ an exported constant that the code itself uses (`CONTEXT_VARIANTS`, `CONTEXT_TAR
 | `relationshipType` value | `owl:ObjectProperty` named lowerCamel of the value, with `ia:typeValue`, `ia:storedIn` the edge class, and the classes it connects as domain / range | `ia:hasAppRole`: `ia:Application` → `ia:AppRole` |
 | Closed value list (`assignmentType`, `origin`, `effect`, `variant`, …) | a class whose `owl:NamedIndividual`s are the values, named `<List>_<value>`; the column points at it with `ia:valueScheme` | `ia:AssignmentType_Direct` |
 | Ownership resources (`lib/ownershipTypes.js`) | subclasses of `ia:OwnershipResource` | `ia:GroupOwnership` |
+| `contextType` (open) | subclasses of `ia:Context` named `<Value>Context`, with `ia:typeValue`, `ia:producedBy` (the plugin, if one emits it) and `ia:allowedTargetType` (the `ia:EntityKind` values it may group) | `ia:ManagerHierarchyContext` |
 
 Every term carries `rdfs:label`, `rdfs:comment` and `rdfs:isDefinedBy <https://identityatlas.io/ontology>`.
 The mapping annotations (`ia:table`, `ia:sqlType`, `ia:typeValue`, …) are `owl:AnnotationProperty`,
@@ -73,8 +74,8 @@ relationship-type properties (`ia:contains`, `ia:owner`, …) are the direct sho
 end nodes and say which classes each type connects; the edge class says where the row is stored.
 
 **What the ontology does not say.** Nullability, keys, indexes, materialised views, history and
-soft-delete mechanics, which keys appear inside `extendedAttributes`, and which `contextType` values
-exist. Those are either physical design (the migrations own them) or data-dependent (a future
+soft-delete mechanics, which keys appear inside `extendedAttributes`, and the `contextType` values that
+only a crawler or an analyst chooses. Those are either physical design (the migrations own them) or data-dependent (a future
 per-install layer, below).
 
 ---
@@ -82,9 +83,10 @@ per-install layer, below).
 ## Scope
 
 **In:** the five node and five edge tables above, every column of them, every closed value list
-the ingest or the database enforces on them, every relationship type, every principal type, and the
+the ingest or the database enforces on them, every relationship type, every principal type, the
 resource types the application's own code branches on (ownership, business role, group, the Entra
-application family, directory roles).
+application family, directory roles), and the context types the application knows: every type a
+context-algorithm plugin emits and every type a route or screen compares against.
 
 **Out, for now** — each is declared with a reason in
 [`ontology/validation.json`](https://github.com/Fortigi/IdentityAtlas/blob/main/ontology/validation.json),
@@ -94,8 +96,9 @@ so a *new* ingest entity type cannot silently fall outside the model:
   CertificationDecisions) — business roles themselves *are* in the core, as Resources;
 - PrincipalActivity and RiskScores;
 - resource types that only one crawler emits (`Entitlement`, `Service`, Omada's `Resource`,
-  Azure RM types, whatever a CSV or SQL source calls things) and every `contextType` value — these are
-  exactly what the dynamic layer is for.
+  Azure RM types, whatever a CSV or SQL source calls things) and the `contextType` values crawlers
+  sync (`OrgUnit`, `Location`, `CostCenter`, `LogicalApplication` …) — these are exactly what the
+  dynamic layer is for.
 
 ---
 
@@ -107,10 +110,12 @@ so a *new* ingest entity type cannot silently fall outside the model:
 | 2 | Every ingest entity type is a class or declared out of scope | `SCHEMAS` / `ENTITY_TABLE_MAP` in `validation.js` | `ontology:check` |
 | 3 | Every closed list the ingest enforces equals the ontology's — relationship types, principal types, assignment types, origins, context variant / target / member type, addedBy — **both directions** | the `enum` of each `SCHEMAS` field | `ontology:check` |
 | 3 | Resource / principal types the code branches on are declared | `OWNERSHIP_RESOURCE_TYPES`, `HIDDEN_BY_DEFAULT_RESOURCE_TYPES`, `GROUP_RESOURCE_TYPES`, `NON_HUMAN_PRINCIPAL_TYPES` | `ontology:check` |
+| 4 | Context types: each type a plugin declares in `contextTypes` is a subclass of `ia:Context` whose `ia:producedBy` names that plugin and whose `ia:allowedTargetType` admits its `targetType`; each `ia:producedBy` names a plugin that still declares the type; each type the code compares against is defined; nothing is defined that nothing uses | `REGISTERED_PLUGINS` (`contexts/plugins/registry.js`) and a scan of `app/api/src` + `app/ui/src` for `contextType` comparisons (`ontology/contextTypeUsage.js`) | `ontology:check` |
 | 4 | Relationship types connect what their edge table connects; ownership relationships point at ownership resources and match `OWNERSHIP_RELATIONSHIP_TYPES`; a polymorphic target (`memberId`) matches its kind column; a foreign key has its target's identifier type | the ontology's own edge definitions and `lib/ownershipTypes.js` | `ontology:check` |
 | 5 | Every ingest field of a core entity is a column or a declared alias, with a compatible type | `SCHEMAS` fields | `ontology:check` |
 | 5 | Every column of every core table is described, with the same type; nothing described is missing; every `IN (…)` CHECK constraint equals the ontology's list | `information_schema.columns`, `pg_constraint` of a database migrated from scratch | contract test (`Contract Tests` job) |
 | 6 | No term declared twice or as two kinds, no conflicting annotations, no case-only clashes, no undeclared references, naming conventions | the ontology itself | `ontology:check` |
+| — | Every `contextType` literal a plugin writes is in its own `contextTypes` | the plugin sources | `contexts/plugins/contextTypes.guard.test.js` (unit job) |
 | — | Data-model diagrams in the docs are generated, validated or marked out of scope; the generated reference page is current | the docs | `ontology:check` |
 
 **Not automated, deliberately:** whether a description is *right*; the prose type tables in
@@ -134,6 +139,42 @@ generated, validated or explicitly out of scope (an unmarked one fails the check
 | `concepts/risk-scoring-model.md` — risk tables | out of scope |
 | `architecture/ingest-api.md` — crawler credential tables | out of scope |
 | every flowchart, graph, sequence, state and gantt diagram (in `api/`, `architecture/`, `concepts/governance-model.md`, `process/`, `risk-scoring/`, `sync/`, `ui/`, and this page) | out of scope by type: process and architecture, not the data model |
+
+---
+
+## Contexts and the manager hierarchy, as implemented
+
+Verified against the code and its tests, not against earlier design documents.
+
+- **One kind of member per context.** `targetType` (Identity, Resource, Principal, System) is set on the
+  context; every `ContextMembers` row of it has that `memberType`. A plugin has one fixed `targetType`
+  and the runner stamps it on everything it writes — which is why accounts-by-system and
+  resources-by-system are two plugins. Each context type in the ontology lists the kinds it may group
+  (`ia:allowedTargetType`); the check compares that with every plugin.
+- **One tree per hierarchy, through `parentContextId`.** There is no second hierarchy mechanism. The
+  tree is acyclic: the routes and the plugin runner refuse a closing link (`cycleGuard.js`), and a
+  deferred trigger (`trg_Contexts_reject_cycle`, migration 059) aborts any transaction that commits a
+  cycle. A child has the same `targetType` as its parent — the manual routes check it, plugin trees are
+  same-type by construction, tags get one root per `targetType` — but the database and the ingest do
+  not (finding 11).
+- **The manager-hierarchy plugin** (`contexts/plugins/manager-hierarchy*.js`) builds one tree per system
+  of accounts (`targetType` Principal, `contextType` `ManagerHierarchy`, `variant` generated):
+    - one node per manager referenced by `Principals.managerId`, plus a synthetic root with
+      `externalId` `root`;
+    - **the manager is recorded only as the node's `externalId`**, the manager's Principal id — there is
+      no manager column on Contexts and no member role. The org-chart route and the member-move route
+      read it from there;
+    - members are the manager's direct reports, after analyst overrides (`ManagerHierarchyOverrides`);
+      a manager is a member of their own manager's node, not of their own;
+    - a node's parent is its manager's own manager's node, else the root; an account with no manager
+      that manages nobody is a member of the root; a top-level manager is a member of no node;
+    - a `managerId` that points at no account of the system still becomes a node, named `Unknown`;
+    - a reporting loop (including an account that is its own manager) reaches the runner as a cycle; the
+      runner keeps all but the closing link, so one node of the loop has no parent and the loop hangs
+      outside the synthetic root.
+
+  Pinned by `manager-hierarchy.helpers.test.js` ("irregular reporting lines"), `runner.refresh.test.js`
+  and the `runnerCycle` / `contextAcyclicTrigger` contract tests; described on `ia:ManagerHierarchyContext`.
 
 ---
 
@@ -172,6 +213,24 @@ its entry (the list only shrinks).
     on Identities only), typed `extendedAttributes` as TEXT and `riskScore` as decimal (they are jsonb
     and integer), and omitted PrincipalRelationships; the PrincipalActivity section named columns
     (`lastActivityDateTime`, `activityCount`, a `systemId` key) the table does not have.
+
+Found while adding the context types (version 1.1.0). Again none of the behavioural ones is changed:
+
+11. **The same-`targetType` rule for a parent and child context is not enforced by the database or
+    the ingest.** `bootstrap.js` calls it an invariant and the manual routes check it, but
+    `parentExternalId` on ingested contexts is resolved without comparing target types.
+12. **Deleting a generated node deletes the manual children under it.** `parentContextId` is
+    `ON DELETE CASCADE`; the runner's header comment said manual children survive (corrected here).
+13. **Two spellings for an org unit.** The `ad-ou-from-dn` plugin writes `OrganisationalUnit`; the Omada,
+    CSV and midPoint crawlers write `OrgUnit`. Nothing branches on either today.
+14. **Two "non-human account" lists.** `NON_HUMAN_PRINCIPAL_TYPES` (account linking) is ServicePrincipal,
+    ManagedIdentity, AIAgent; `riskscoring/engine.js` keeps its own inline list that also includes
+    WorkloadIdentity.
+15. **`WorkloadIdentity` and `SharedMailbox` are accepted but no built-in crawler emits them.** They
+    arrive only through CSV, SQL, SCIM or midPoint mappings; the Entra crawler deliberately does not
+    classify workload identities.
+16. **A stale code comment, corrected here:** `buildMemberRows` said reports of a manager missing from
+    the dataset go to the root; they stay together under an `Unknown` node.
 
 ---
 

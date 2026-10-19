@@ -3,3 +3,6 @@
 - The Entity Relationship Diagram on the Data Model page is now generated from the ontology, so it always matches the real schema (it previously showed columns that do not exist and missed the principal relationships table)
 - Corrected the PrincipalActivity description on the Data Model page (its columns and key)
 - CI now fails when the data model changes without the ontology — for example a new relationship type, principal type, column or allowed value — and when a data-model diagram in the docs drifts from it; run `npm run ontology:check` in `app/api` to check locally
+- The core ontology now also describes the context types Identity Atlas itself knows — manager hierarchy, departments, OUs, tags, the type and system trees, clusters and more — with what each one groups and which plugin makes it; the Core Model Reference lists them
+- Documented how the manager hierarchy is built: who is a member of which team, how the manager of a team is recorded, and what happens with unknown managers and reporting loops
+- CI now also fails when a context plugin starts writing a context type, or grouping a different kind of entity, that the ontology does not describe

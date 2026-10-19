@@ -10,12 +10,14 @@
 //   4. relationship definitions agree with the model: endpoints, ownership,
 //      polymorphic targets;
 //   5. every ingest field of a core entity is a described column (or a declared
-//      alias of one) with a compatible type.
+//      alias of one) with a compatible type;
+//   +  context types agree with the plugins and the code (./contexts.js).
 
 import { INGEST_TO_SQL } from '../vocabulary.js';
 import {
   columnsOf, isSubClassOf, relationshipTypesOf, schemeMembers, tableClasses, typedSubclasses, valueSetFor,
 } from '../model.js';
+import { checkContextTypes } from './contexts.js';
 
 const err = (code, subject, message) => ({ code, subject, message });
 
@@ -161,5 +163,6 @@ export function checkImplementation(model, registry, config = {}) {
     ...checkOwnership(model, registry),
     ...checkRelationshipEndpoints(model),
     ...checkPolymorphicTargets(model),
+    ...checkContextTypes(model, registry),
   ];
 }

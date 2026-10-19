@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderReference } from './referenceDoc.js';
 import { coreClassDiagram } from './mermaid.js';
-import { MINI_TTL, modelOf } from './__tests__/miniOntology.js';
+import { CONTEXT_TTL, MINI_TTL, modelOf } from './__tests__/miniOntology.js';
 
 describe('renderReference', () => {
   const md = renderReference(modelOf());
@@ -65,5 +65,20 @@ describe('renderReference', () => {
 
   it('says which columns use each value list', () => {
     expect(md).toContain('`ia:AssignmentType` — How it is held. Used by `ResourceAssignments.assignmentType`.');
+  });
+});
+
+describe('renderReference — context types', () => {
+  const md = renderReference(modelOf(CONTEXT_TTL));
+
+  it('adds what a context type groups and what makes it', () => {
+    expect(md).toContain('| Value | Class | Groups | Made by | Meaning |');
+    expect(md).toContain('| `ManagerHierarchy` | `ia:ManagerHierarchyContext` | Principal | `manager-hierarchy` | A team. |');
+    // Target types sorted, and a type no plugin emits is made by application code.
+    expect(md).toContain('| `Tag` | `ia:TagContext` | Principal, Resource | application code | A label. |');
+  });
+
+  it('keeps the three-column table for type lists without context annotations', () => {
+    expect(md).toContain('| `GroupOwnership` | `ia:GroupOwnership` | (ia:OwnershipResource) Owners of a group. |');
   });
 });

@@ -8,6 +8,8 @@ import { runCheck, loadConfig } from './cli.js';
 import { loadRegistry } from './registry.js';
 import { RELATIONSHIP_TYPES, PRINCIPAL_TYPES, ASSIGNMENT_TYPES } from '../ingest/validation.js';
 import { OWNERSHIP_RESOURCE_TYPES } from '../lib/ownershipTypes.js';
+import { REGISTERED_PLUGINS } from '../contexts/plugins/registry.js';
+import { MANAGER_HIERARCHY_CONTEXT_TYPE } from '../contexts/plugins/manager-hierarchy.helpers.js';
 
 describe('core ontology (repository)', () => {
   const result = runCheck();
@@ -46,5 +48,34 @@ describe('core ontology (repository)', () => {
     };
     expect(runCheck({ registry }).errors.map(e => `${e.code} ${e.subject}`))
       .toEqual(['value-missing-from-ontology resource-relationships.relationshipType']);
+  });
+
+  it('reads the context plugins from the plugin registry', () => {
+    const { plugins } = loadRegistry().contexts;
+    expect(plugins.map(p => p.name)).toEqual(REGISTERED_PLUGINS.map(p => p.name));
+    expect(plugins.find(p => p.name === 'manager-hierarchy'))
+      .toEqual({ name: 'manager-hierarchy', targetType: 'Principal', contextTypes: [MANAGER_HIERARCHY_CONTEXT_TYPE] });
+  });
+
+  it('fails for a context type a plugin emits but the ontology lacks', () => {
+    const registry = loadRegistry();
+    const mh = registry.contexts.plugins.find(p => p.name === 'manager-hierarchy');
+    mh.contextTypes = [...mh.contextTypes, 'ManagerHierarchyRoot'];
+    expect(runCheck({ registry }).errors.map(e => `${e.code} ${e.subject}`))
+      .toEqual(['context-type-undefined Context:ManagerHierarchyRoot']);
+  });
+
+  it('fails when a plugin starts grouping a different kind of entity', () => {
+    const registry = loadRegistry();
+    registry.contexts.plugins.find(p => p.name === 'manager-hierarchy').targetType = 'Identity';
+    expect(runCheck({ registry }).errors.map(e => `${e.code} ${e.subject}`))
+      .toEqual(['context-target-type-mismatch ia:ManagerHierarchyContext']);
+  });
+
+  it('fails for a context type the code compares against but the ontology lacks', () => {
+    const registry = loadRegistry();
+    registry.contexts.branchedOn.set('OrgUnit', ['app/api/src/routes/example.js:1']);
+    expect(runCheck({ registry }).errors.map(e => `${e.code} ${e.subject}`))
+      .toEqual(['context-type-undefined Context:OrgUnit']);
   });
 });
