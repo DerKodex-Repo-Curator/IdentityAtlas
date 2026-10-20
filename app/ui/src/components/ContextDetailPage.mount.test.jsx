@@ -213,8 +213,20 @@ describe('ContextDetailPage (mounted)', () => {
     expect(screen.getByText('Backend Squad')).toBeInTheDocument();
     expect(await screen.findByText('Alice Engineer')).toBeInTheDocument();
     expect(screen.getByText('Bob Builder')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('alice@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Staff Engineer')).toBeInTheDocument();
+    // A people context has no account status column.
+    expect(screen.queryByText('Active')).toBeNull();
+  });
+
+  it('shows an account member\'s type and status', async () => {
+    const authFetch = routes({
+      '/api/contexts/ctx-1': { ...generatedDetail, attributes: { ...generatedDetail.attributes, targetType: 'Principal' } },
+    });
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+    const alice = (await screen.findByText('Alice Engineer')).closest('tr');
+    expect([...alice.cells].map(c => c.textContent).slice(0, 5)).toEqual(['Alice Engineer', 'alice@example.com', 'Staff Engineer', 'User', 'Active']);
+    expect(screen.getByText('Bob Builder').closest('tr')).toHaveTextContent('Disabled');
   });
 
   it('has no Attributes tab and shows each remaining attribute once, under More details', async () => {
@@ -379,6 +391,33 @@ describe('ContextDetailPage (mounted)', () => {
     await screen.findByText('Alice Engineer');
     const wrapper = container.querySelector('table').closest('.overflow-x-auto');
     expect(wrapper).toBeTruthy();
+  });
+
+  it('shows a person member\'s email, job title and department', async () => {
+    const authFetch = routes({
+      '/api/contexts/ctx-1/members': { total: 1, data: [
+        { id: 'm-1', displayName: 'Alice Engineer', email: 'alice@example.com', jobTitle: 'Staff Engineer', department: 'R&D' },
+      ] },
+    });
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+    const row = (await screen.findByText('Alice Engineer')).closest('tr');
+    expect([...row.cells].map(c => c.textContent).slice(0, 4)).toEqual(['Alice Engineer', 'alice@example.com', 'Staff Engineer', 'R&D']);
+    const headers = [...row.closest('table').querySelectorAll('th')].map(t => t.textContent);
+    expect(headers.slice(0, 4)).toEqual(['Name', 'Email', 'Job Title', 'Department']);
+  });
+
+  it('shows a resource member\'s type, description and status instead of person columns', async () => {
+    const authFetch = routes({
+      '/api/contexts/ctx-1': { ...generatedDetail, attributes: { ...generatedDetail.attributes, targetType: 'Resource' } },
+      '/api/contexts/ctx-1/members': { total: 1, data: [
+        { id: 'r-1', displayName: 'SG-Finance', resourceType: 'Group', description: 'Finance team', enabled: false },
+      ] },
+    });
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+    const row = (await screen.findByText('SG-Finance')).closest('tr');
+    expect([...row.cells].map(c => c.textContent).slice(0, 4)).toEqual(['SG-Finance', 'Group', 'Finance team', 'Disabled']);
+    const headers = [...row.closest('table').querySelectorAll('th')].map(t => t.textContent);
+    expect(headers).not.toContain('Email');
   });
 
   it('renders the empty members state', async () => {

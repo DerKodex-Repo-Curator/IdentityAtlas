@@ -7,3 +7,4 @@
 - The suggested owner's reason reads naturally for small units ("manager of the only member", "all 5 members").
 - The context page no longer has an Attributes tab: every attribute now appears once at the top, with the less-used ones under a collapsible "More details", and editing a context moved to an Edit button in the header.
 - Accountable and Responsible are shown read-only with a small edit button that opens a pop-up to look people up, add, remove or clear them; the best guess's "Choose someone else" opens the same pop-up.
+- A context's member list now shows each member's details: e-mail, job title, type and status for accounts; e-mail, job title and department for people; type, description and status for resources.

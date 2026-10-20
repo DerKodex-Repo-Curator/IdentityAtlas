@@ -27,6 +27,16 @@ const MEMBER_TABLE = {
   System:    'Systems',
 };
 
+// What a member row carries besides its name, per kind of member — the columns
+// the context's members table shows (email and job title for people and
+// accounts, type and description for resources).
+export const MEMBER_COLUMNS = {
+  Identity:  'm.email, m."jobTitle", m.department',
+  Resource:  'm."resourceType", m.description, m.enabled',
+  Principal: 'm.email, m."jobTitle", m."principalType", m."accountEnabled"',
+  System:    'm.description',
+};
+
 // How a member row joins its entity. ContextMembers."memberId" is a uuid, and so
 // is the id of every member table except Systems (integer). Compare like with
 // like: casting both sides to text hides both indexes, and the planner then falls
@@ -294,8 +304,8 @@ async function loadMembers(contextId, targetType, { limit = 100, offset = 0, sea
       )`
     : null;
 
-  // Identity / Resource / Principal all have displayName. Systems have
-  // displayName too. Keep the projection uniform.
+  // Every member table has displayName; the rest of the row is what the members
+  // table shows for that kind of member (MEMBER_COLUMNS).
   const params = [contextId];
   let searchClause = '';
   if (search) {
@@ -313,7 +323,7 @@ async function loadMembers(contextId, targetType, { limit = 100, offset = 0, sea
   const distinct = includeDescendants ? 'DISTINCT ON (m.id)' : '';
 
   const dataSql = `
-    SELECT ${distinct} m.id, m."displayName",
+    SELECT ${distinct} m.id, m."displayName", ${MEMBER_COLUMNS[targetType]},
            cm."addedBy", cm."addedAt"
       FROM "ContextMembers" cm
       JOIN "${table}" m ON ${memberJoinOn(targetType)}
