@@ -1,5 +1,10 @@
 ## Changes in this PR
 
+- Azure: new guide "Managing the Azure deployment as code", with ready-to-copy workflows. One proposes each new stable release as a pull request with the release notes; the other shows a what-if on that pull request and deploys after the merge. Template changes arrive in the same reviewable pull request as the new images.
+- Azure: sign-in can now be configured in the deployment template itself (`entraTenantId` / `entraClientId`), so redeploying to upgrade no longer clears it. Configuring it afterwards with Step 2 keeps working as before.
+
+## Changes in this PR
+
 - Every release now includes `IdentityAtlas-azure-<version>.zip`: the Azure template as it is at that release, set to deploy exactly that release's images by default. Keep it in your own repository to manage the deployment as code: the template and the images it runs can no longer drift apart, and an upgrade brings template changes and new images in together.
 
 ## Changes in this PR
