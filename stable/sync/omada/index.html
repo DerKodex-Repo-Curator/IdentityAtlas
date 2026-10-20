@@ -5700,7 +5700,7 @@ upgrading: <a href="../../reference/troubleshooting/#crawler-url-rejected">Crawl
 The <code>CRAWLER_MANIFESTS_DIR</code> environment variable on the web container must point to the folder containing the crawler manifests. See <a href="../../architecture/docker-setup/">Docker setup</a>.</p>
 <p><strong><code>$metadata</code> returns HTTP 500 (Omada Cloud)</strong>
 Some cloud tenants return 500 on <code>$metadata</code>. This is non-fatal — the wizard shows a warning but the sync itself still runs all configured phases.</p>
-<p><strong>Save, discovery or the job fails with <em>baseUrl rejected<em> or </em>tokenEndpoint rejected</em></strong>
+<p><strong>Save, discovery or the job fails with <em>baseUrl rejected</em> or <em>tokenEndpoint rejected</em></strong>
 The URL uses <code>http</code> or resolves to a private, loopback or cloud-metadata address. For an on-premises Omada server enable <strong>Allow private network</strong> (and, only if it has no https, <strong>Allow insecure HTTP</strong>) — see <a href="#network-access">Network access</a>. Metadata and link-local addresses cannot be enabled.</p>
 <p><strong>Cookie session expires during a scheduled sync</strong>
 <code>FormCookie</code> and <code>CookieString</code> sessions typically expire after 20–60 minutes. Use <code>OAuth2CC</code> or <code>OAuth2ROPC</code> for unattended scheduled syncs.</p>

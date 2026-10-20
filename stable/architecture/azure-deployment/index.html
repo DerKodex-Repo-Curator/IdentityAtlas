@@ -5888,6 +5888,7 @@ channel by redeploying with <code>imageChannel=stable</code> (the default) — p
 <p><strong>TLS to Postgres.</strong> The web app sets <code>PGSSLMODE=require</code>. With node-postgres this already verifies the server certificate chain and hostname (it is treated as <code>ssl: true</code>, unlike libpq's <code>require</code>), so no separate <code>verify-full</code> setting is needed.</p>
 <h3 id="postgres-admin-password">Postgres admin password<a class="headerlink" href="#postgres-admin-password" title="Permanent link">&para;</a></h3>
 <p>The admin password is random, generated once by the bootstrap script and stored in Key Vault as <code>postgres-admin-password</code>; the template passes it to the server with <code>getSecret()</code> and the web app references the exact secret version. Nothing about it is derived from resource names.</p>
+<p>The <code>getSecret()</code> call sits in a wrapper module (<code>postgres-kv-password.bicep</code>) that gets the vault name from the key-vault module's output. Do not move it back to a vault named statically in <code>main.bicep</code>: ARM then resolves the reference during preflight validation, before the vault exists, and every fresh install fails with <code>KeyVaultParameterReferenceNotFound</code> (this happened in v6.0.0). <code>test/unit/AzureKeyVaultReferences.Tests.ps1</code> guards it.</p>
 <p><strong>Deployments created before this change</strong> used a password derived from the subscription ID and resource group name, which anyone who learns both can compute. Redeploying keeps that password (nothing rotates silently). Rotate it once, deliberately:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">az</span> <span class="n">deployment</span> <span class="nb">group </span><span class="n">create</span> <span class="n">-g</span> <span class="p">&lt;</span><span class="n">rg</span><span class="p">&gt;</span> <span class="p">-</span><span class="n">-template</span><span class="o">-file</span> <span class="n">azure</span><span class="p">/</span><span class="n">main</span><span class="p">.</span><span class="n">bicep</span> <span class="p">-</span><span class="n">-parameters</span> <span class="n">rotatePostgresPassword</span><span class="p">=</span><span class="n">true</span>
 </code></pre></div>
@@ -6035,6 +6036,10 @@ channel by redeploying with <code>imageChannel=stable</code> (the default) — p
 <tr>
 <td><code>azure/modules/postgres.bicep</code></td>
 <td>Postgres Flex</td>
+</tr>
+<tr>
+<td><code>azure/modules/postgres-kv-password.bicep</code></td>
+<td>Wrapper that reads the Postgres password from Key Vault (<code>getSecret()</code>) at deploy time, not at preflight</td>
 </tr>
 <tr>
 <td><code>azure/modules/app-service.bicep</code></td>

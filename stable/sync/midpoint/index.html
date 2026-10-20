@@ -5785,7 +5785,7 @@ reachable over public https needs neither. Details and the upgrade note:
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p><strong>midPoint not visible in "Add Crawler"</strong>
 The <code>CRAWLER_MANIFESTS_DIR</code> environment variable on the web container must point to the folder containing the crawler manifests. See <a href="../../architecture/docker-setup/">Docker setup</a>.</p>
-<p><strong>Save, discovery or the job fails with <em>baseUrl rejected<em> or </em>tokenEndpoint rejected</em></strong>
+<p><strong>Save, discovery or the job fails with <em>baseUrl rejected</em> or <em>tokenEndpoint rejected</em></strong>
 The URL uses <code>http</code> or resolves to a private, loopback or cloud-metadata address. midPoint usually runs on-premises: enable <strong>Allow private network</strong>, and <strong>Allow insecure HTTP</strong> only if it is served over plain http (e.g. <code>http://midpoint:8080</code>) — see <a href="#network-access">Network access</a>.</p>
 <p><strong>Shadow search returns 500</strong>
 Shadow search requires <code>?options=raw</code>. This is handled automatically by the crawler; if you see 500 errors, check your midPoint version (4.x required).</p>
