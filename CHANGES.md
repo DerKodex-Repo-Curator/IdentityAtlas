@@ -1,5 +1,11 @@
 ## Changes in this PR
 
+- Azure: deploy an exact release with the new `imageTag` parameter (for example `6.0.2.0`). It applies to the web app, the worker and the report generator together, overrides `imageChannel`, and makes every deployment reproducible: upgrading or rolling back is a change to one value, and redeploying creates the new revision without a manual restart. Leaving it empty keeps today's behaviour.
+- Azure: pull the images from your own Azure Container Registry (for example a pull-through cache of ghcr.io) with the new `containerRegistryResourceId` parameter. The template creates a pull-only identity and grants it AcrPull on that registry.
+- Azure: redeploying no longer issues a new report generator API key every time, which restarted both containers even when nothing had changed. The key is now generated once and kept in Key Vault.
+
+## Changes in this PR
+
 - Fixed the Reports page intermittently failing with "Error loading reports (HTTP 500)" on deployments with several custom reports and a large dataset. The page no longer looks up the deployment's attributes and value lists once per custom report, and requests that arrive together now share one lookup instead of each starting their own.
 
 ## Changes in this PR
