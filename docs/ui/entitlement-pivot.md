@@ -1,7 +1,7 @@
 ---
 type: task
 prereq: ui/contexts.md
-outcome: You can run the Entitlement Pivot over any context of resources, choose its columns and its Excel pivots, and save that setup as a view your colleagues can open from the Reports page.
+outcome: You can run the Entitlement Pivot over any context of resources or unit of accounts, choose its columns and its Excel pivots, and save that setup as a view your colleagues can open from the Reports page.
 ---
 
 # Entitlement Pivot and saved views
@@ -21,6 +21,19 @@ account.
 
 Above the table the report summarises the scope: unique users, number of entitlements, how many have
 an owner, and the share that is part of a business role.
+
+## On a unit of accounts
+
+A **unit of accounts** (for example a department of Entra accounts) works too. The report then lists
+the resources the unit's **direct members** hold, and the counts only count those members: "3 of
+this department hold it", not everyone in the company. A resource that only people outside the unit
+hold is not in the list, and neither are business roles (they show in *Granted by role(s)*). Accounts
+in sub-units are not included; add the sub-units to the run to review them as well. A run cannot mix
+units of accounts with contexts of resources, because the counts would mean different things; the
+report says so instead.
+
+The quickest way in is the unit's own page: **Actions › Download entitlement report** downloads the
+Excel file for that unit. A unit of people has no report yet; open the accounts view of the same unit.
 
 ## Choosing the columns
 

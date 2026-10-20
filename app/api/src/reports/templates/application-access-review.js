@@ -3,7 +3,9 @@
 //
 // An owner is accountable for who can reach "their" thing — a logical
 // application, a department's file shares, everything tagged PCI. In Identity
-// Atlas that thing is a Context whose members are resources. This report lists
+// Atlas that thing is a Context whose members are resources — or a unit of
+// accounts, whose entitlements are the ones its members hold (see
+// ../heldEntitlements.js; such a run counts only the members). This report lists
 // those resources, one row per entitlement, with how many people hold each one
 // directly and how many through a business role, and which roles those are.
 // When a role grants an entitlement, the role's policy manages who holds it, so
@@ -30,6 +32,9 @@
 import * as db from '../../db/connection.js';
 import { OWNERSHIP_RELATIONSHIP_TYPES_SQL, OWNERSHIP_TYPES_SQL } from '../../lib/ownershipTypes.js';
 import { MAX_LIST, parseList, resolveFields } from '../accessReviewFields.js';
+import {
+  fetchHeldEntitlements, fetchMemberAssignmentCounts, fetchMemberUserTotal, memberCountKey,
+} from '../heldEntitlements.js';
 
 export { parseList };
 
@@ -128,7 +133,8 @@ export default {
         type: 'array',
         title: 'Contexts',
         description: 'Whose resources to review. Any context of resources works: a logical application, '
-          + 'a department, a tag. Picking from the list stores the context\'s id, so a name shared by '
+          + 'a department, a tag. A unit of accounts works too: it reviews the entitlements its direct '
+          + 'members hold, counting only those members. Picking from the list stores the context\'s id, so a name shared by '
           + 'several contexts cannot select all of them by accident.',
         'x-lookup': 'resource-contexts',
         'x-lookupPlaceholder': 'Search contexts…',
@@ -177,46 +183,23 @@ export default {
     const notices = [...contextNotices(wanted, contexts), ...picks.notices];
     const shape = { columns: layout.columns, pivots: layout.pivots };
     if (contexts.length === 0) return { rows: [], notices, ...shape };
+    const reads = readsFor(contexts);
+    if (!reads) return { rows: [], notices: [...notices, MIXED_KINDS_NOTICE], ...shape };
 
-    const entitlements = await fetchEntitlements(contexts.map(c => c.id));
+    const contextIds = contexts.map(c => c.id);
+    const entitlements = await reads.entitlements(contextIds, MAX_ROWS + 1);
     const truncated = entitlements.length > MAX_ROWS;
     const capped = truncated ? entitlements.slice(0, MAX_ROWS) : entitlements;
     if (capped.length === 0) {
-      notices.push({
-        severity: 'info',
-        text: `${describe(contexts)} has no resources as members. Either nothing has been synced for it `
-          + 'yet, or it groups something other than resources.',
-      });
+      notices.push({ severity: 'info', text: `${describe(contexts)} ${reads.emptyText}` });
       return { rows: [], notices, ...shape };
     }
 
-    const ids = capped.map(e => e.id);
-    const [counts, roles, owners, users] = await Promise.all([
-      fetchAssignmentCounts(ids), fetchRoles(ids), fetchOwners(ids), fetchUserTotal(ids),
-    ]);
-
-    const byContext = new Map(contexts.map(c => [c.id, c]));
-    const rows = capped
-      .map(e => ({
-        entitlement: e,
-        context: byContext.get(e.contextId),
-        count: counts.get(e.id),
-        roles: roles.get(e.id) || null,
-        owner: owners.get(e.id),
-      }))
-      .sort(compareSources)
-      .map(source => buildRow(layout.fields, source));
-
+    const { rows, counts, owners, users } = await assembleRows(reads, contexts, capped, layout.fields);
     const eligible = [...counts.values()].reduce((sum, c) => sum + (c.eligible || 0), 0);
     notices.push(...summaries(rows, { users, eligible }, contexts, owners));
     notices.push(...emptyFieldNotices(rows, layout.fields));
-    if (truncated) {
-      notices.push({
-        severity: 'warning',
-        text: `${describe(contexts)} holds ${entitlements.length.toLocaleString('en-US')} entitlements; this `
-          + `run shows the first ${MAX_ROWS.toLocaleString('en-US')}. Run it per context to see all of them.`,
-      });
-    }
+    if (truncated) notices.push(truncationNotice(contexts, entitlements.length));
 
     ctx?.log?.(`access review report: ${rows.length} entitlement(s) across ${contexts.length} context(s)`);
     // One context resolved — not one NAME asked for. A name that matches three
@@ -227,6 +210,74 @@ export default {
     return { rows, notices, truncated, constantColumns, ...shape };
   },
 };
+
+// ─── Two kinds of context, one report ─────────────────────────────────────
+
+// A context of resources names its entitlements as members, and counts every
+// holder. A unit of accounts holds its entitlements through its members, and
+// counts only them (./heldEntitlements.js says why). The rest of the run —
+// roles, owners, layout, summaries — is the same for both.
+const RESOURCE_READS = {
+  entitlements: fetchEntitlements,
+  counts: (contextIds, ids) => fetchAssignmentCounts(ids),
+  countKey: e => e.id,
+  users: (contextIds, ids) => fetchUserTotal(ids),
+  emptyText: 'has no resources as members. Either nothing has been synced for it yet, or it groups '
+    + 'something other than resources.',
+};
+
+const MEMBER_READS = {
+  entitlements: fetchHeldEntitlements,
+  counts: fetchMemberAssignmentCounts,
+  countKey: e => memberCountKey(e.contextId, e.id),
+  users: fetchMemberUserTotal,
+  emptyText: 'has no members holding an entitlement.',
+};
+
+// A run over both kinds at once is refused rather than guessed at: the two count
+// holders differently (everyone vs. the unit's own members), and one column must
+// not mean two things on adjacent rows.
+const MIXED_KINDS_NOTICE = {
+  severity: 'warning',
+  text: 'Pick contexts of one kind: contexts of resources, or units of accounts. Their holder counts '
+    + 'mean different things, so one run cannot mix them.',
+};
+
+/** The reads for the contexts' kind, or null when they are of both kinds. */
+export function readsFor(contexts) {
+  const kinds = new Set(contexts.map(c => c.targetType));
+  if (kinds.size > 1) return null;
+  return kinds.has('Principal') ? MEMBER_READS : RESOURCE_READS;
+}
+
+// The four per-entitlement reads, folded into sorted rows.
+async function assembleRows(reads, contexts, entitlements, fields) {
+  const contextIds = contexts.map(c => c.id);
+  const ids = [...new Set(entitlements.map(e => e.id))];
+  const [counts, roles, owners, users] = await Promise.all([
+    reads.counts(contextIds, ids), fetchRoles(ids), fetchOwners(ids), reads.users(contextIds, ids),
+  ]);
+  const byContext = new Map(contexts.map(c => [c.id, c]));
+  const rows = entitlements
+    .map(e => ({
+      entitlement: e,
+      context: byContext.get(e.contextId),
+      count: counts.get(reads.countKey(e)),
+      roles: roles.get(e.id) || null,
+      owner: owners.get(e.id),
+    }))
+    .sort(compareSources)
+    .map(source => buildRow(fields, source));
+  return { rows, counts, owners, users };
+}
+
+function truncationNotice(contexts, found) {
+  return {
+    severity: 'warning',
+    text: `${describe(contexts)} holds ${found.toLocaleString('en-US')} entitlements; this `
+      + `run shows the first ${MAX_ROWS.toLocaleString('en-US')}. Run it per context to see all of them.`,
+  };
+}
 
 // ─── Parameters ───────────────────────────────────────────────────────────
 
@@ -257,14 +308,15 @@ export function fieldParameters(params) {
 
 // ─── Resolving the contexts ───────────────────────────────────────────────
 
-// Any context whose members are resources. Matched against the two things a
+// Any context whose members are resources, or a unit of accounts (whose
+// members' entitlements are reviewed instead, see ../heldEntitlements.js). Matched against the two things a
 // person can reasonably have to hand: the name they see, and the id a picker or
 // a deep link carries. Name matching is case-insensitive because a catalogue and
 // the people reading it never agree on capitals.
 async function resolveContexts(wanted) {
   const names = wanted.map(w => w.toLowerCase());
   const { rows } = await db.query(
-    `SELECT c.id, c."displayName", c."contextType", c.description, c."ownerUserId", c."extendedAttributes",
+    `SELECT c.id, c."displayName", c."targetType", c."contextType", c.description, c."ownerUserId", c."extendedAttributes",
             p."displayName" AS "ownerName"
        FROM "Contexts" c
        LEFT JOIN LATERAL (
@@ -274,7 +326,7 @@ async function resolveContexts(wanted) {
                AND (pr."externalId" = c."ownerUserId" OR pr."employeeId" = c."ownerUserId")
              ORDER BY (pr."externalId" = c."ownerUserId") DESC
              LIMIT 1) p ON TRUE
-      WHERE c."targetType" = 'Resource'
+      WHERE c."targetType" IN ('Resource', 'Principal')
         AND (lower(c."displayName") = ANY($1::text[]) OR c.id::text = ANY($1::text[]))
       ORDER BY c."displayName"`, [names]);
   return rows;
@@ -290,7 +342,7 @@ function contextNotices(wanted, contexts) {
   if (missing.length) {
     notices.push({
       severity: 'warning',
-      text: `No context of resources matches ${missing.map(m => `"${m}"`).join(', ')}. `
+      text: `No context of resources or accounts matches ${missing.map(m => `"${m}"`).join(', ')}. `
         + 'Check the spelling against the Contexts page, or pick it from the list.',
     });
   }

@@ -4,31 +4,36 @@
 // page (profileFor returns null).
 //
 //   title            heading of the facts card
+//   noun             what the page calls the context ("this unit")
 //   accountableLabel what the Accountable role is called here (an
 //                    application's Accountable is its Owner)
-//   membersLabel     the label of the member-count fact
-//   membersWithKind  say what the members are ("12 People") — a unit can be
-//                    any kind; an application's members are always resources
+//   membersLabel     the label of the member-count fact when it does not name
+//                    the kind of member
+//   membersWithKind  label the member fact with the kind of member
+//                    ("Accounts") — a unit can hold any kind; an
+//                    application's members are always resources
 //   showSubUnits     show the number of sub-units
-//   variantsAlways   show "Variants of this unit" even when there are none
-//                    (for an application only when it has any — rare)
+//   variantsLabel    heading of the same unit held as other kinds of member;
+//                    the section is shown only when there are such variants
 
 export const PROFILES = {
   OrganizationalUnit: {
     title: 'About this unit',
+    noun: 'this unit',
     accountableLabel: 'Accountable',
     membersLabel: 'Members',
     membersWithKind: true,
     showSubUnits: true,
-    variantsAlways: true,
+    variantsLabel: 'This unit as',
   },
   LogicalApplication: {
     title: 'About this application',
+    noun: 'this application',
     accountableLabel: 'Owner',
     membersLabel: 'Resources',
     membersWithKind: false,
     showSubUnits: false,
-    variantsAlways: false,
+    variantsLabel: 'This application as',
   },
 };
 

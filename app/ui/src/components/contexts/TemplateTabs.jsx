@@ -1,19 +1,13 @@
 import TabBar from '@ui/components/TabBar';
-import { SegmentedControl } from '@ui/components/matrix/wizardControls';
 
-// The Contexts page's sub-tabs — one per template — and, on Organisation, the
-// switch between its three kinds of tree: People, Accounts, Resources. One tree
-// kind at a time: a unit's people and its accounts are separate contexts and
-// are never shown merged.
-export default function TemplateTabs({ tabs, active, onChange, kinds, kind, onKindChange }) {
+// The Contexts page's sub-tabs — one per template. No numbers: they would count
+// trees, which a reader takes for units ("Organisation 9"). The kind of member
+// (People · Accounts · Resources) is chosen in the tree panel's header.
+export default function TemplateTabs({ tabs, active, onChange }) {
+  const plain = (tabs || []).map(({ key, label }) => ({ key, label }));
   return (
-    <div className="px-4 pt-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-end justify-between gap-3">
-      <TabBar tabs={tabs} active={active} onChange={onChange} />
-      {active === 'OrganizationalUnit' && (
-        <div className="pb-2">
-          <SegmentedControl label="Kind of unit" options={kinds} value={kind} onChange={onKindChange} />
-        </div>
-      )}
+    <div className="px-4 pt-3 border-b border-gray-200 dark:border-gray-700">
+      <TabBar tabs={plain} active={active} onChange={onChange} />
     </div>
   );
 }

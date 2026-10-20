@@ -105,7 +105,7 @@ describe('suggestAccountable', () => {
     query.mockResolvedValueOnce({ rows: [{ id: P1, displayName: 'Boss', count: 11 }] });
     expect(await suggestAccountable({ id: CTX, targetType: 'Principal' })).toEqual({
       role: 'Accountable', principalId: P1, displayName: 'Boss',
-      reason: 'manager of 11 of the 14 members', count: 11, total: 14,
+      reason: 'manages 11 of the 14 members', count: 11, total: 14,
     });
     expect(queryOne.mock.calls[0][0]).toContain('FROM "ContextMembers" WHERE "contextId" = $1 AND "memberType" = $2');
     expect(queryOne.mock.calls[0][1]).toEqual([CTX, 'Principal']);
@@ -116,7 +116,7 @@ describe('suggestAccountable', () => {
     queryOne.mockResolvedValueOnce({ total: 5 });
     query.mockResolvedValueOnce({ rows: [{ id: P1, displayName: 'Jan', count: 2 }] });
     const s = await suggestAccountable({ id: CTX, targetType: 'Identity' });
-    expect(s).toMatchObject({ identityId: P1, reason: 'manager of 2 of the 5 members' });
+    expect(s).toMatchObject({ identityId: P1, reason: 'manages 2 of the 5 members' });
     expect(s).not.toHaveProperty('principalId');
     expect(query.mock.calls[0][0]).toBe(SIGNALS.Identity.sql);
   });
@@ -125,7 +125,7 @@ describe('suggestAccountable', () => {
     queryOne.mockResolvedValueOnce({ total: 6 });
     query.mockResolvedValueOnce({ rows: [{ id: P1, displayName: 'Owner', count: 4 }] });
     const s = await suggestAccountable({ id: CTX, targetType: 'Resource' });
-    expect(s).toMatchObject({ principalId: P1, reason: 'owner of 4 of the 6 resources', count: 4, total: 6 });
+    expect(s).toMatchObject({ principalId: P1, reason: 'owns 4 of the 6 resources', count: 4, total: 6 });
     expect(query.mock.calls[0][0]).toBe(SIGNALS.Resource.sql);
   });
 
@@ -133,7 +133,7 @@ describe('suggestAccountable', () => {
     queryOne.mockResolvedValueOnce({ total: 1 });
     query.mockResolvedValueOnce({ rows: [{ id: P1, displayName: 'Manager', count: 1 }] });
     const s = await suggestAccountable({ id: CTX, targetType: 'Principal' });
-    expect(s.reason).toBe('manager of the only member');
+    expect(s.reason).toBe('manages the only member');
   });
 });
 

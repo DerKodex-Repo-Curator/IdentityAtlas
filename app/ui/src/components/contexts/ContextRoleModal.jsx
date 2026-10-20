@@ -18,10 +18,11 @@ import { Modal, ErrorBox, PrimaryButton, SecondaryButton } from './ModalPrimitiv
 //                and the lookup to add one. Each change is made straight
 //                away, as the API calls are one per holder; Done closes.
 
-export default function ContextRoleModal({ role, label, holders, onAdd, onRemove, onClose, error }) {
+export default function ContextRoleModal({ role, label, helper, holders, onAdd, onRemove, onClose, error }) {
   const title = `${role === 'Accountable' ? 'Set' : 'Edit'} ${label}`;
   return (
     <Modal title={title} onClose={onClose} width={440}>
+      {helper && <p data-testid="role-helper" className="mb-3 text-sm text-gray-600 dark:text-gray-400">{label}: {helper.charAt(0).toLowerCase() + helper.slice(1)}.</p>}
       {role === 'Accountable'
         ? <AccountableBody label={label} holder={holders[0] || null} onAdd={onAdd} onRemove={onRemove} onClose={onClose} />
         : <ResponsibleBody holders={holders} onAdd={onAdd} onRemove={onRemove} onClose={onClose} />}
@@ -72,7 +73,7 @@ function ResponsibleBody({ holders, onAdd, onRemove, onClose }) {
   return (
     <div className="space-y-3 text-xs">
       {holders.length === 0
-        ? <p className="text-gray-600 dark:text-gray-400">Nobody is Responsible yet.</p>
+        ? <p className="text-gray-600 dark:text-gray-400">Nobody is responsible yet.</p>
         : (
           <ul aria-label="Responsible" className="flex flex-wrap gap-1.5">
             {holders.map(r => (

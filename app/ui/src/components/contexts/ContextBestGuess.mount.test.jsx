@@ -7,7 +7,7 @@ import { renderWithProviders, makeAuthFetch, jsonResponse, screen, waitFor, with
 // The best guess lives inside ContextPeople's Accountable fact, so it is
 // mounted through it — the way every profile uses it.
 const ORG = { id: 'ctx-1', contextCategory: 'OrganizationalUnit' };
-const GUESS = { role: 'Accountable', principalId: 'p-mgr', displayName: 'Mara Lindqvist', reason: 'manager of 11 of the 14 members', count: 11, total: 14 };
+const GUESS = { role: 'Accountable', principalId: 'p-mgr', displayName: 'Mara Lindqvist', reason: 'manages 11 of the 14 members', count: 11, total: 14 };
 
 // Serves roles from `state` (so a confirmed role shows up on reload), the
 // suggestion (or a 204), and the reject; records the calls.
@@ -36,7 +36,7 @@ function api({ suggestion = GUESS, roles = [], failReject = false } = {}) {
   return { authFetch, state };
 }
 
-const accountableFact = () => screen.getByText('Accountable', { selector: 'dt' }).nextElementSibling;
+const accountableFact = () => screen.getByRole('group', { name: 'Accountable' }).lastElementChild;
 
 function mount({ attrs = ORG, auth = {}, suggest = true, ...opts } = {}) {
   const { authFetch, state } = api(opts);
@@ -44,13 +44,14 @@ function mount({ attrs = ORG, auth = {}, suggest = true, ...opts } = {}) {
   return { authFetch, state, user: userEvent.setup() };
 }
 
-describe('ContextPeople — best guess for the Accountable', () => {
-  it('shows the guess with its reason inside the Accountable fact', async () => {
+describe('ContextPeople — the suggested Accountable', () => {
+  it('shows the suggestion with its reason under the Accountable role', async () => {
     mount();
     const guess = await screen.findByTestId('best-guess');
-    expect(guess).toHaveTextContent('Best guess: Mara Lindqvist');
-    expect(guess).toHaveTextContent('(manager of 11 of the 14 members)');
-    expect(accountableFact()).toHaveTextContent(/^—/);
+    expect(guess).toHaveTextContent(/^Suggested: Mara Lindqvist· manages 11 of the 14 membersConfirmNot this personChoose someone else$/);
+    expect(guess.textContent).not.toMatch(/Best guess|Reject/);
+    expect(accountableFact()).toContainElement(guess);
+    expect(accountableFact()).toHaveTextContent(/^Nobody is accountable yet/);
   });
 
   it('Confirm sets the Accountable and refreshes, after which the guess is gone', async () => {
@@ -60,27 +61,27 @@ describe('ContextPeople — best guess for the Accountable', () => {
       method: 'PUT', body: JSON.stringify({ role: 'Accountable', principalId: 'p-mgr' }),
     }));
     await waitFor(() => expect(screen.queryByTestId('best-guess')).toBeNull());
-    expect(accountableFact()).toHaveTextContent(/^Mara Lindqvist$/);
+    expect(accountableFact()).toHaveTextContent(/^MLMara Lindqvist$/);
   });
 
-  it('Reject tells the API who was rejected and hides the guess', async () => {
+  it('Not this person tells the API who was rejected and hides the guess', async () => {
     const { state, user } = mount();
-    await user.click(within(await screen.findByTestId('best-guess')).getByRole('button', { name: 'Reject' }));
+    await user.click(within(await screen.findByTestId('best-guess')).getByRole('button', { name: 'Not this person' }));
     await waitFor(() => expect(screen.queryByTestId('best-guess')).toBeNull());
     expect(state.rejected).toEqual([{ principalId: 'p-mgr' }]);
-    expect(accountableFact()).toHaveTextContent(/^—/);
+    expect(accountableFact()).toHaveTextContent(/^Nobody is accountable yet/);
   });
 
   it('a person-level guess is confirmed and rejected by identity', async () => {
     const { authFetch, state, user } = mount({ suggestion: { ...GUESS, principalId: undefined, identityId: 'i-7' } });
-    await user.click(within(await screen.findByTestId('best-guess')).getByRole('button', { name: 'Reject' }));
+    await user.click(within(await screen.findByTestId('best-guess')).getByRole('button', { name: 'Not this person' }));
     await waitFor(() => expect(state.rejected).toEqual([{ identityId: 'i-7' }]));
     expect(authFetch).not.toHaveBeenCalledWith('/api/contexts/ctx-1/roles', expect.objectContaining({ method: 'PUT' }));
   });
 
   it('keeps the guess and shows why when the reject is refused', async () => {
     const { user } = mount({ failReject: true });
-    await user.click(within(await screen.findByTestId('best-guess')).getByRole('button', { name: 'Reject' }));
+    await user.click(within(await screen.findByTestId('best-guess')).getByRole('button', { name: 'Not this person' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('not allowed');
     expect(screen.getByTestId('best-guess')).toBeInTheDocument();
   });
@@ -100,11 +101,11 @@ describe('ContextPeople — best guess for the Accountable', () => {
     }));
   });
 
-  it('shows a reader the guess without Confirm, Reject, Choose someone else or a pencil', async () => {
+  it('shows a reader the suggestion without Confirm, Not this person, Choose someone else or a pencil', async () => {
     mount({ auth: { hasWildcard: false, permissions: new Set(['data.read']) } });
     expect(await screen.findByTestId('best-guess')).toHaveTextContent('Mara Lindqvist');
     expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Not this person' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Choose someone else' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Accountable' })).toBeNull();
   });
@@ -112,7 +113,7 @@ describe('ContextPeople — best guess for the Accountable', () => {
   it('shows nothing when the API has no suggestion (204)', async () => {
     const { authFetch } = mount({ suggestion: null });
     await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/contexts/ctx-1/roles/suggestion'));
-    await waitFor(() => expect(accountableFact()).toHaveTextContent(/^—$/));
+    await waitFor(() => expect(accountableFact()).toHaveTextContent(/^Nobody is accountable yet.Set accountable$/));
     expect(screen.queryByTestId('best-guess')).toBeNull();
   });
 
@@ -125,7 +126,7 @@ describe('ContextPeople — best guess for the Accountable', () => {
 
   it('does not ask for a guess without the suggest flag (the generic header use)', async () => {
     const { authFetch } = mount({ suggest: false });
-    await waitFor(() => expect(accountableFact()).toHaveTextContent(/^—$/));
+    await waitFor(() => expect(accountableFact()).toHaveTextContent(/^Nobody is accountable yet.Set accountable$/));
     expect(authFetch).not.toHaveBeenCalledWith('/api/contexts/ctx-1/roles/suggestion');
   });
 });
