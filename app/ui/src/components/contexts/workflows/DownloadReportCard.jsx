@@ -3,6 +3,7 @@ import { useAuth } from '@ui/auth/AuthGate';
 import { downloadReport } from '@ui/components/reports/reportExport';
 import ReportError from '@ui/components/reports/ReportError';
 import { matrixHrefForContext } from '@ui/utils/matrixFilter';
+import { useIsSharedView } from '@ui/contexts/SharedViewContext';
 import { ENTITLEMENT_PIVOT_REPORT, reportTarget } from './reportTarget';
 
 // The spreadsheet is the report's primary artefact (it opens on its pivot
@@ -15,6 +16,8 @@ const FORMAT = 'xlsx';
 // the one parameter that matters here: contexts = [the resource context].
 export default function DownloadReportCard({ attrs, variants, variantsLoading }) {
   const { authFetch } = useAuth();
+  // A read-only shell (a context owner) has no matrix to fall back to.
+  const readOnly = useIsSharedView();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const target = reportTarget(attrs, variants);
@@ -51,10 +54,10 @@ export default function DownloadReportCard({ attrs, variants, variantsLoading })
     return (
       <>
         <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">This unit has no resources variant yet.</p>
-        <a href={matrixHrefForContext(attrs)} target="_blank" rel="noopener noreferrer"
+        {!readOnly && <a href={matrixHrefForContext(attrs)} target="_blank" rel="noopener noreferrer"
           className="inline-block rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
           Open in matrix
-        </a>
+        </a>}
       </>
     );
   }

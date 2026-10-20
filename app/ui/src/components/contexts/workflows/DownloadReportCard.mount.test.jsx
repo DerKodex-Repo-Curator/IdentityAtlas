@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createElement as h } from 'react';
 import DownloadReportCard from './DownloadReportCard';
+import { SharedViewContext } from '@ui/contexts/SharedViewContext';
 import { renderWithProviders, makeAuthFetch, blobResponse, screen, waitFor, userEvent } from '@ui/test-utils/renderWithProviders';
 
 // The card runs the Entitlement Pivot through the report export endpoint —
@@ -83,5 +84,16 @@ describe('DownloadReportCard', () => {
     expect(await screen.findByText('Download failed')).toBeInTheDocument();
     expect(screen.getByText('HTTP 500')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download report' })).toBeEnabled();
+  });
+
+  it('in a read-only shell (a context owner) offers no matrix to fall back to', () => {
+    const authFetch = makeAuthFetch({});
+    renderWithProviders(
+      h(SharedViewContext.Provider, { value: true },
+        h(DownloadReportCard, { attrs: { ...PEOPLE, targetType: 'Principal' }, variants: VARIANTS.slice(0, 1), variantsLoading: false })),
+      { auth: { authFetch } },
+    );
+    expect(screen.getByText('This unit has no resources variant yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open in matrix' })).toBeNull();
   });
 });

@@ -21,21 +21,32 @@ function SubContextsList({ subContexts, onOpenDetail }) {
         Sub-contexts ({subContexts.length})
       </h3>
       <div className="space-y-1">
-        {subContexts.map(sc => (
-          <button
-            key={sc.id}
-            onClick={() => onOpenDetail('context', sc.id, sc.displayName)}
-            className="w-full text-left flex items-center justify-between px-3 py-2 rounded hover:bg-sky-50 dark:bg-sky-900/30 transition-colors group"
-          >
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-sky-100 text-sky-700 dark:text-sky-300 text-[9px] font-bold">CTX</span>
-              <span className="text-sm text-gray-900 dark:text-white group-hover:text-sky-700 dark:hover:text-sky-300">{sc.displayName}</span>
-            </div>
-            {sc.memberCount != null && (
-              <span className="text-xs text-gray-600 dark:text-gray-500">{sc.memberCount} members</span>
-            )}
-          </button>
-        ))}
+        {subContexts.map(sc => {
+          const body = (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-sky-100 text-sky-700 dark:text-sky-300 text-[9px] font-bold">CTX</span>
+                <span className="text-sm text-gray-900 dark:text-white group-hover:text-sky-700 dark:hover:text-sky-300">{sc.displayName}</span>
+              </div>
+              {sc.memberCount != null && (
+                <span className="text-xs text-gray-600 dark:text-gray-500">{sc.memberCount} members</span>
+              )}
+            </>
+          );
+          // Without a detail handler (a read-only shell) a sub-context is a fact, not a link.
+          if (!onOpenDetail) {
+            return <div key={sc.id} className="flex items-center justify-between px-3 py-2">{body}</div>;
+          }
+          return (
+            <button
+              key={sc.id}
+              onClick={() => onOpenDetail('context', sc.id, sc.displayName)}
+              className="w-full text-left flex items-center justify-between px-3 py-2 rounded hover:bg-sky-50 dark:bg-sky-900/30 transition-colors group"
+            >
+              {body}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -162,10 +173,10 @@ function MembersTable({ members, canEditMembers, isGenerated, includeDescendants
           {members.map(m => (
             <tr
               key={m.id}
-              className="border-b border-gray-50 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
-              onClick={() => onOpenDetail(memberDetailKind(targetType), m.id, m.displayName)}
+              className={onOpenDetail ? 'border-b border-gray-50 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer' : 'border-b border-gray-50 dark:border-gray-700'}
+              onClick={onOpenDetail ? () => onOpenDetail(memberDetailKind(targetType), m.id, m.displayName) : undefined}
             >
-              <td className="py-1.5 text-blue-600 dark:text-blue-400 hover:underline">{m.displayName}</td>
+              <td className={onOpenDetail ? 'py-1.5 text-blue-600 dark:text-blue-400 hover:underline' : 'py-1.5 text-gray-900 dark:text-gray-100'}>{m.displayName}</td>
               <td className="py-1.5 text-gray-600 dark:text-gray-400">{m.email || '-'}</td>
               <td className="py-1.5 text-gray-600 dark:text-gray-400">{m.jobTitle || '-'}</td>
               <td className="py-1.5">

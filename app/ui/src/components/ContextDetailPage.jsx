@@ -12,6 +12,7 @@ import EntityTimeline from './EntityTimeline';
 import useTimeline from '@ui/hooks/useTimeline';
 import useFeatures from '@ui/hooks/useFeatures';
 import { useHasPermission } from '@ui/auth/usePermissions';
+import { useIsSharedView } from '@ui/contexts/SharedViewContext';
 
 // ─── Context Detail Page ──────────────────────────────────────────────────────
 // Shows details for a single Context (v6 shape): header with variant /
@@ -24,11 +25,20 @@ import { useHasPermission } from '@ui/auth/usePermissions';
 // button (onClose then only runs after a delete), an "Open as page" button
 // (onOpenAsPage(attrs)) instead. `refreshKey` re-reads the context when the
 // tree beside it changed it; `onEdited` tells the page an edit here did.
+//
+// Inside a read-only shell (SharedViewContext — a context owner's page) the
+// page edits nothing and links nowhere it could not open: no Edit, no Open as
+// page, no member add/remove, and members, people and timeline entries are
+// plain text. `onOpenDetail` then only carries the variant switch, which the
+// shell resolves against what the owner may see.
 
 export default function ContextDetailPage({ contextId, onCacheData, onClose, onOpenDetail, embedded = false, onOpenAsPage, refreshKey, onEdited }) {
   const { authFetch } = useAuth();
   const features = useFeatures();
   const canWrite = useHasPermission('data.write.contexts');
+  const readOnly = useIsSharedView();
+  // What the page may link to: nothing but the shell's own handler when read-only.
+  const openEntity = readOnly ? undefined : onOpenDetail;
   const [editing, setEditing] = useState(false);
   // loading/error are flipped synchronously inside the fetch effects; reducer
   // dispatches keep that clear of set-state-in-effect.
@@ -128,7 +138,7 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
   // Analyst-owned membership writes work for both manual + generated
   // contexts. Synced is the only variant we refuse — the source system
   // would overwrite the analyst edit on the next crawl.
-  const canEditMembers = isManual || isGenerated;
+  const canEditMembers = !readOnly && (isManual || isGenerated);
 
   const tabs = detailTabs(features.riskScoring && riskData?.riskScore != null, memberTotal);
 
@@ -153,7 +163,7 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
         pageSize={PAGE_SIZE}
         authFetch={authFetch}
         onMembersChanged={() => { fetchMembers(); fetchDetail(); onEdited?.(); }}
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={openEntity}
       />
     ),
 
@@ -163,7 +173,7 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
         loading={timeline.loading}
         sinceDays={timelineDays}
         onSinceDaysChange={setTimelineDays}
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={openEntity}
       />
     ),
 
@@ -177,8 +187,9 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
         attrs={detail.attributes}
         subContexts={subContexts}
         onClose={close}
-        onOpenAsPage={embedded ? () => onOpenAsPage?.(detail.attributes) : undefined}
+        onOpenAsPage={embedded && !readOnly ? () => onOpenAsPage?.(detail.attributes) : undefined}
         onOpenDetail={onOpenDetail}
+        openEntity={openEntity}
         onEdit={canWrite && canEditMembers ? () => setEditing(true) : undefined}
       />
 
@@ -244,11 +255,11 @@ function detailTabs(hasRisk, memberTotal) {
 // template's profile (facts, variants, workflows), with the remaining
 // attributes (More details) at the foot of its facts. Tags, segments and the
 // rest keep the generic page, with More details as a card of its own.
-function DetailTop({ contextId, attrs, subContexts, onClose, onOpenAsPage, onOpenDetail, onEdit }) {
+function DetailTop({ contextId, attrs, subContexts, onClose, onOpenAsPage, onOpenDetail, openEntity, onEdit }) {
   const profile = profileFor(attrs.contextCategory);
   return (
     <>
-      <ContextDetailHeader attrs={attrs} onClose={onClose} onOpenAsPage={onOpenAsPage} onOpenDetail={onOpenDetail} onEdit={onEdit} />
+      <ContextDetailHeader attrs={attrs} onClose={onClose} onOpenAsPage={onOpenAsPage} onOpenDetail={openEntity} onEdit={onEdit} />
       {attrs.description && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{attrs.description}</div>
       )}

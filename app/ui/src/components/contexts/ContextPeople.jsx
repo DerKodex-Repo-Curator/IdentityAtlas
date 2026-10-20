@@ -3,6 +3,7 @@ import { useAuth } from '@ui/auth/AuthGate';
 import { useFetch } from '@ui/hooks/useFetch';
 import { useHasPermission } from '@ui/auth/usePermissions';
 import { PencilIcon } from '@ui/components/admin/adminIcons';
+import { useIsSharedView } from '@ui/contexts/SharedViewContext';
 import ContextBestGuess from './ContextBestGuess';
 import ContextRoleModal from './ContextRoleModal';
 
@@ -22,12 +23,17 @@ import ContextRoleModal from './ContextRoleModal';
 // turn on `suggest`: with no Accountable set, the Accountable fact then shows
 // the API's best guess with Confirm / Reject / Choose someone else — the last
 // opens the same Accountable modal.
+//
+// In a read-only shell (a context owner's page) the names are plain text and
+// there is no best guess: the owner sees who answers for the unit, nothing to act on.
 
 const ROLED_CATEGORIES = new Set(['OrganizationalUnit', 'LogicalApplication']);
 
 export default function ContextPeople({ attrs, onOpenDetail, heading = 'People', accountableLabel = 'Accountable', suggest = false }) {
   const { authFetch } = useAuth();
-  const canWrite = useHasPermission('data.write.contexts');
+  const readOnly = useIsSharedView();
+  const canWrite = useHasPermission('data.write.contexts') && !readOnly;
+  const openPerson = readOnly ? undefined : onOpenDetail;
   const enabled = ROLED_CATEGORIES.has(attrs?.contextCategory);
   const { data: roles, loading, error, reload } = useFetch(`/api/contexts/${attrs?.id}/roles`, { authFetch, enabled, initialData: [] });
   const [actionError, setActionError] = useState(null);
@@ -74,7 +80,7 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
   const responsible = list.filter(r => r.role === 'Responsible');
   const message = actionError || (error ? error.message : null);
   // Only once the roles have loaded: before that "no Accountable" is not known.
-  const showGuess = accountable.length === 0 && suggest && !loading && !error;
+  const showGuess = accountable.length === 0 && suggest && !readOnly && !loading && !error;
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700" data-testid="context-people">
@@ -82,7 +88,7 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         <dt className="text-gray-500 dark:text-gray-400">{accountableLabel}</dt>
         <dd className="flex flex-wrap items-center gap-1">
-          <RoleNames holders={accountable} onOpenDetail={onOpenDetail} />
+          <RoleNames holders={accountable} onOpenDetail={openPerson} />
           {canWrite && <EditButton label={accountableLabel} onClick={() => open('Accountable')} />}
           {showGuess && (
             <ContextBestGuess contextId={attrs.id} canWrite={canWrite}
@@ -91,7 +97,7 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
         </dd>
         <dt className="text-gray-500 dark:text-gray-400">Responsible</dt>
         <dd className="flex flex-wrap items-center gap-1">
-          <RoleNames holders={responsible} onOpenDetail={onOpenDetail} />
+          <RoleNames holders={responsible} onOpenDetail={openPerson} />
           {canWrite && <EditButton label="Responsible" onClick={() => open('Responsible')} />}
         </dd>
       </dl>
