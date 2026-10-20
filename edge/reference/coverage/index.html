@@ -5442,23 +5442,23 @@
 <tbody>
 <tr>
 <td><a href="../../coverage/api/">API (Node / Vitest — unit + contract)</a></td>
-<td>93.3%</td>
-<td>85.6%</td>
+<td>93.4%</td>
+<td>85.7%</td>
 <td>90.1%</td>
 <td>3.4 / 20</td>
 <td>1.9 / 15</td>
 <td>86.0%</td>
-<td>13,331 / 14,281</td>
+<td>13,407 / 14,354</td>
 </tr>
 <tr>
 <td><a href="../../coverage/ui/">UI (React / Vitest)</a></td>
-<td>86.7%</td>
-<td>77.2%</td>
-<td>77.0%</td>
+<td>86.8%</td>
+<td>77.4%</td>
+<td>77.1%</td>
 <td>2.8 / 28</td>
 <td>1.1 / 15</td>
 <td>69.5%</td>
-<td>8,328 / 9,600</td>
+<td>8,350 / 9,611</td>
 </tr>
 <tr>
 <td><a href="../../coverage/powershell/">PowerShell (Pester)</a></td>
@@ -5477,18 +5477,18 @@
 <p>Every figure above is scoped to what its tool actually measured. The notes below are generated from the same reports as the table, so they stay true as the numbers move. They are descriptive, not gates — no CI job fails on anything in this section.</p>
 <h3 id="api-node-vitest-unit-contract">API (Node / Vitest — unit + contract)<a class="headerlink" href="#api-node-vitest-unit-contract" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Mutation is scoped.</strong> Mutation testing covers 98 file(s) of 303 — 31% of the suite's coverable lines. It describes that subset — not the suite — and is not comparable with the suite-wide line figure on the same row. <strong>The score itself is older than that scope:</strong> it was measured over 18 file(s), before the current list was committed. Mutation runs are regenerated on their own schedule, so the percentage catches up on the next run.</li>
-<li><strong>method coverage (90.1%) sits below line coverage (93.3%)</strong> — roughly a third of functions are never invoked, while the ones that are get exercised well. Typically components rendered but not interacted with: the untested part is event handlers, callbacks and conditional render paths.</li>
+<li><strong>Mutation is scoped.</strong> Mutation testing covers 98 file(s) of 304 — 31% of the suite's coverable lines. It describes that subset — not the suite — and is not comparable with the suite-wide line figure on the same row. <strong>The score itself is older than that scope:</strong> it was measured over 18 file(s), before the current list was committed. Mutation runs are regenerated on their own schedule, so the percentage catches up on the next run.</li>
+<li><strong>method coverage (90.1%) sits below line coverage (93.4%)</strong> — roughly a third of functions are never invoked, while the ones that are get exercised well. Typically components rendered but not interacted with: the untested part is event handlers, callbacks and conditional render paths.</li>
 </ul>
 <h3 id="ui-react-vitest">UI (React / Vitest)<a class="headerlink" href="#ui-react-vitest" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Mutation is scoped.</strong> Mutation testing covers 66 file(s) of 335 — 16% of the suite's coverable lines. It describes that subset — not the suite — and is not comparable with the suite-wide line figure on the same row. <strong>The score itself is older than that scope:</strong> it was measured over 6 file(s), before the current list was committed. Mutation runs are regenerated on their own schedule, so the percentage catches up on the next run.</li>
-<li><strong>method coverage (77.0%) sits below line coverage (86.7%)</strong> — roughly a third of functions are never invoked, while the ones that are get exercised well. Typically components rendered but not interacted with: the untested part is event handlers, callbacks and conditional render paths.</li>
+<li><strong>Mutation is scoped.</strong> Mutation testing covers 66 file(s) of 336 — 16% of the suite's coverable lines. It describes that subset — not the suite — and is not comparable with the suite-wide line figure on the same row. <strong>The score itself is older than that scope:</strong> it was measured over 6 file(s), before the current list was committed. Mutation runs are regenerated on their own schedule, so the percentage catches up on the next run.</li>
+<li><strong>method coverage (77.1%) sits below line coverage (86.8%)</strong> — roughly a third of functions are never invoked, while the ones that are get exercised well. Typically components rendered but not interacted with: the untested part is event handlers, callbacks and conditional render paths.</li>
 <li><strong>The most complex code is the least branch-covered.</strong> <code>app/ui/src/components/MatrixView.jsx</code> (Function 'MatrixView', cyclomatic 20, 68.8% branch) — below this suite's own branch average, so the aggregate percentage overstates how well the hard parts are tested.</li>
 </ul>
 <h3 id="powershell-pester">PowerShell (Pester)<a class="headerlink" href="#powershell-pester" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Mutation is scoped.</strong> Mutation testing covers 138 file(s) of 169 — 94% of the suite's coverable lines, using 4 mutation operators. It describes that subset — not the suite — and is not comparable with the suite-wide line figure on the same row. <strong>The score itself is older than that scope:</strong> it was measured over 90 file(s), before the current list was committed. Mutation runs are regenerated on their own schedule, so the percentage catches up on the next run.</li>
+<li><strong>Mutation is scoped.</strong> Mutation testing covers 140 file(s) of 169 — 94% of the suite's coverable lines, using 4 mutation operators. It describes that subset — not the suite — and is not comparable with the suite-wide line figure on the same row. <strong>The score itself is older than that scope:</strong> it was measured over 90 file(s), before the current list was committed. Mutation runs are regenerated on their own schedule, so the percentage catches up on the next run.</li>
 <li><strong>No branch coverage is measured.</strong> The line figure is not comparable with the suites that report both — and for Pester it is command-based rather than true line coverage, so it is not directly comparable with the Vitest suites either.</li>
 </ul>
 <h2 id="browsable-reports">Browsable reports<a class="headerlink" href="#browsable-reports" title="Permanent link">&para;</a></h2>
@@ -5498,7 +5498,7 @@
 <li><a href="../../coverage/ui/">UI (React / Vitest)</a></li>
 <li><a href="../../coverage/powershell/">PowerShell (Pester)</a></li>
 </ul>
-<p><em>Generated 2026-10-20 15:39 UTC from commit <code>22fb34e2</code>.</em></p>
+<p><em>Generated 2026-10-20 16:22 UTC from commit <code>618d4b1a</code>.</em></p>
 
 
 
