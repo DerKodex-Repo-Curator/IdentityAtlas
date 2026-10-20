@@ -16,7 +16,7 @@
         <link rel="prev" href="../azure-deployment-walkthrough/">
       
       
-        <link rel="next" href="../desktop-portable/">
+        <link rel="next" href="../azure-gitops/">
       
       
         
@@ -1960,6 +1960,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pinning-an-exact-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinning an exact release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulling-the-images-from-your-own-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pulling the images from your own registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2056,6 +2078,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../azure-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure as Code (GitOps)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -5467,6 +5517,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pinning-an-exact-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinning an exact release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulling-the-images-from-your-own-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pulling the images from your own registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5826,17 +5898,74 @@ channel by redeploying with <code>imageChannel=stable</code> (the default) — p
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c"># Restart the worker — same</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">az</span> <span class="n">containerapp</span> <span class="n">revision</span> <span class="n">restart</span> <span class="p">-</span><span class="n">-name</span> <span class="p">&lt;</span><span class="n">namePrefix</span><span class="p">&gt;</span><span class="n">-worker</span> <span class="p">-</span><span class="n">-resource-group</span> <span class="p">&lt;</span><span class="n">rg</span><span class="p">&gt;</span> <span class="p">-</span><span class="n">-revision</span> <span class="p">&lt;</span><span class="n">latestRevisionName</span><span class="p">&gt;</span>
 </code></pre></div>
-<p>To pin to an exact version tag rather than a channel, edit <code>_imageTag</code> in <code>main.bicep</code> directly and redeploy — the CLI/portal <code>imageChannel</code> parameter only offers the <code>stable</code> / <code>edge</code> channels above.</p>
+<p>A restart only re-pulls the floating tag. To make the version part of the
+deployment itself, pin it.</p>
+<h3 id="pinning-an-exact-release">Pinning an exact release<a class="headerlink" href="#pinning-an-exact-release" title="Permanent link">&para;</a></h3>
+<p>Set <code>imageTag</code> to the release you want (<code>./deploy.ps1 -ImageTag 6.0.2.0</code>, or the
+<code>imageTag</code> parameter in your parameters file). Every release is published under
+its own version for all three images: <code>X.Y.Z.0</code> for a release, <code>X.Y.Z-beta.N</code>
+(or <code>-rc.N</code> / <code>-alpha.N</code>) for a pre-release. When <code>imageTag</code> is set it overrides
+<code>imageChannel</code>. When it is empty, the deployment follows the channel as before.</p>
+<p><strong>Every release also ships its template, already pinned.</strong> The GitHub release
+has <code>IdentityAtlas-azure-&lt;version&gt;.zip</code> attached: the <code>azure/</code> folder as it is
+at that release, with <code>imageTag</code> defaulting to that release's images. A
+template taken from that package deploys exactly the images it was released
+with, without anyone filling in a version, so template and images cannot drift
+apart. It is the copy to keep in your own repository when you manage the
+deployment as code: an upgrade then brings the template changes and the new
+images in together. (The Deploy to Azure button keeps reading <code>main</code>'s
+template, which is not pinned and follows <code>imageChannel</code>.) For the full setup,
+an update workflow that proposes each new release as a pull request plus a
+deploy pipeline, see <a href="../azure-gitops/">Managing the Azure deployment as code</a>.</p>
+<p>With the version pinned:</p>
+<ul>
+<li><strong>Every deployment is reproducible.</strong> The same template and parameters run the
+  same release, whenever you deploy them.</li>
+<li><strong>An upgrade is a change to one value.</strong> A new version changes the image
+  reference, so redeploying creates a new revision on its own. You don't need to
+  restart anything by hand.</li>
+<li><strong>A rollback is redeploying the previous version.</strong> Images only, though:
+  database migrations run forward. If a newer release has already migrated the
+  schema, an older release then runs on a newer schema. Take a Postgres restore
+  point (Flexible Server point-in-time restore) before an upgrade, and restore it
+  if you need to go back across a migration.</li>
+</ul>
+<h3 id="pulling-the-images-from-your-own-registry">Pulling the images from your own registry<a class="headerlink" href="#pulling-the-images-from-your-own-registry" title="Permanent link">&para;</a></h3>
+<p>To keep your own copy of the images, for example when the deployment may not
+reach ghcr.io, or to keep exactly what you ran, mirror them into an Azure
+Container Registry with a cache rule, and point the template at that registry:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># One cache rule per image. The ghcr.io/fortigi images are public, so the rules</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># need no credentials.</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">for</span><span class="w"> </span>img<span class="w"> </span><span class="k">in</span><span class="w"> </span>identity-atlas<span class="w"> </span>identity-atlas-worker<span class="w"> </span>identity-atlas-report-generator<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>az<span class="w"> </span>acr<span class="w"> </span>cache<span class="w"> </span>create<span class="w"> </span>--registry<span class="w"> </span>&lt;acr&gt;<span class="w"> </span>--name<span class="w"> </span><span class="s2">"</span><span class="nv">$img</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span>--source-repo<span class="w"> </span><span class="s2">"ghcr.io/fortigi/</span><span class="nv">$img</span><span class="s2">"</span><span class="w"> </span>--target-repo<span class="w"> </span><span class="s2">"fortigi/</span><span class="nv">$img</span><span class="s2">"</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">done</span>
+</code></pre></div>
+<p>Then deploy with <code>containerRegistryResourceId</code> set to the registry's full
+resource ID (<code>./deploy.ps1 -ContainerRegistryResourceId /subscriptions/.../registries/&lt;acr&gt;</code>).
+The template then:</p>
+<ul>
+<li>creates a pull-only managed identity (<code>&lt;namePrefix&gt;-mi-acrpull</code>) and grants it
+  <strong>AcrPull</strong> on that registry,</li>
+<li>pulls the web, worker and report-generator images from
+  <code>&lt;acr&gt;.azurecr.io/fortigi/...</code> with that identity.</li>
+</ul>
+<p>The images must sit at the same paths (<code>fortigi/identity-atlas</code>,
+<code>fortigi/identity-atlas-worker</code>, <code>fortigi/identity-atlas-report-generator</code>),
+which the cache rules above give you. Whoever runs the deployment needs the
+right to create role assignments on the registry (Owner, User Access
+Administrator or Role Based Access Control Administrator). Combine it with
+<code>imageTag</code> to pin the version you pull through.</p>
 <h3 id="logs">Logs<a class="headerlink" href="#logs" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># App Service stdout, live</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>az<span class="w"> </span>webapp<span class="w"> </span>log<span class="w"> </span>tail<span class="w"> </span>--name<span class="w"> </span>&lt;namePrefix&gt;-web<span class="w"> </span>--resource-group<span class="w"> </span>&lt;rg&gt;
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Worker container logs, live</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>az<span class="w"> </span>containerapp<span class="w"> </span>logs<span class="w"> </span>show<span class="w"> </span>--name<span class="w"> </span>&lt;namePrefix&gt;-worker<span class="w"> </span>--resource-group<span class="w"> </span>&lt;rg&gt;<span class="w"> </span>--follow
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># App Service stdout, live</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>az<span class="w"> </span>webapp<span class="w"> </span>log<span class="w"> </span>tail<span class="w"> </span>--name<span class="w"> </span>&lt;namePrefix&gt;-web<span class="w"> </span>--resource-group<span class="w"> </span>&lt;rg&gt;
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Worker container logs, live</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>az<span class="w"> </span>containerapp<span class="w"> </span>logs<span class="w"> </span>show<span class="w"> </span>--name<span class="w"> </span>&lt;namePrefix&gt;-worker<span class="w"> </span>--resource-group<span class="w"> </span>&lt;rg&gt;<span class="w"> </span>--follow
 </code></pre></div>
 <p>Or query Log Analytics (whether created here or BYO):
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">AppServiceConsoleLogs</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">_ResourceId</span><span class="w"> </span><span class="n">endswith</span><span class="w"> </span><span class="s">"&lt;namePrefix&gt;-web"</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">ContainerAppConsoleLogs_CL</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">ContainerAppName_s</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s">"&lt;namePrefix&gt;-worker"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">AppServiceConsoleLogs</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">_ResourceId</span><span class="w"> </span><span class="n">endswith</span><span class="w"> </span><span class="s">"&lt;namePrefix&gt;-web"</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">ContainerAppConsoleLogs_CL</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="k">where</span><span class="w"> </span><span class="n">ContainerAppName_s</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s">"&lt;namePrefix&gt;-worker"</span>
 </code></pre></div></p>
 <h3 id="network-modes">Network modes<a class="headerlink" href="#network-modes" title="Permanent link">&para;</a></h3>
 <p>The <code>networkMode</code> parameter picks the network shape.</p>
@@ -5890,7 +6019,7 @@ channel by redeploying with <code>imageChannel=stable</code> (the default) — p
 <p>The admin password is random, generated once by the bootstrap script and stored in Key Vault as <code>postgres-admin-password</code>; the template passes it to the server with <code>getSecret()</code> and the web app references the exact secret version. Nothing about it is derived from resource names.</p>
 <p>The <code>getSecret()</code> call sits in a wrapper module (<code>postgres-kv-password.bicep</code>) that gets the vault name from the key-vault module's output. Do not move it back to a vault named statically in <code>main.bicep</code>: ARM then resolves the reference during preflight validation, before the vault exists, and every fresh install fails with <code>KeyVaultParameterReferenceNotFound</code> (this happened in v6.0.0). <code>test/unit/AzureKeyVaultReferences.Tests.ps1</code> guards it.</p>
 <p><strong>Deployments created before this change</strong> used a password derived from the subscription ID and resource group name, which anyone who learns both can compute. Redeploying keeps that password (nothing rotates silently). Rotate it once, deliberately:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">az</span> <span class="n">deployment</span> <span class="nb">group </span><span class="n">create</span> <span class="n">-g</span> <span class="p">&lt;</span><span class="n">rg</span><span class="p">&gt;</span> <span class="p">-</span><span class="n">-template</span><span class="o">-file</span> <span class="n">azure</span><span class="p">/</span><span class="n">main</span><span class="p">.</span><span class="n">bicep</span> <span class="p">-</span><span class="n">-parameters</span> <span class="n">rotatePostgresPassword</span><span class="p">=</span><span class="n">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">az</span> <span class="n">deployment</span> <span class="nb">group </span><span class="n">create</span> <span class="n">-g</span> <span class="p">&lt;</span><span class="n">rg</span><span class="p">&gt;</span> <span class="p">-</span><span class="n">-template</span><span class="o">-file</span> <span class="n">azure</span><span class="p">/</span><span class="n">main</span><span class="p">.</span><span class="n">bicep</span> <span class="p">-</span><span class="n">-parameters</span> <span class="n">rotatePostgresPassword</span><span class="p">=</span><span class="n">true</span>
 </code></pre></div>
 <p>The bootstrap script writes a new random password to Key Vault, the Postgres server is updated, and the web app restarts onto the new secret version in the same deployment (expect a short interruption). Redeploy later without the parameter (it defaults to <code>false</code>); passing it again rotates again. In the portal, set <strong>Rotate Postgres Password</strong> to <code>true</code> on the Deploy to Azure form.</p>
 <p><strong>Entra ID authentication for Postgres</strong> (a managed-identity token instead of a password) is not enabled yet. It needs an Entra administrator on the server, a database role for the web app's managed identity, and token acquisition in the API; the schema is currently owned by the password-based admin role. Tracked as a follow-up.</p>
@@ -5901,7 +6030,7 @@ channel by redeploying with <code>imageChannel=stable</code> (the default) — p
 3. <code>psql "postgres://identityatlas:&lt;pw&gt;@&lt;pgFqdn&gt;:5432/identity_atlas?sslmode=require"</code>.
 4. Delete the firewall rule when done.</p>
 <h3 id="tearing-down">Tearing down<a class="headerlink" href="#tearing-down" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>az<span class="w"> </span>group<span class="w"> </span>delete<span class="w"> </span>--name<span class="w"> </span>&lt;rg&gt;<span class="w"> </span>--yes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>az<span class="w"> </span>group<span class="w"> </span>delete<span class="w"> </span>--name<span class="w"> </span>&lt;rg&gt;<span class="w"> </span>--yes
 </code></pre></div>
 <p>Key Vault has soft delete + purge protection (7-day retention). To redeploy with the same KV name within those 7 days, either wait or deploy into a different resource group — the name prefix is derived from the resource group ID, so it can no longer be chosen directly.</p>
 <h2 id="decisions-taken-and-why">Decisions taken (and why)<a class="headerlink" href="#decisions-taken-and-why" title="Permanent link">&para;</a></h2>
@@ -5931,8 +6060,13 @@ channel by redeploying with <code>imageChannel=stable</code> (the default) — p
 </tr>
 <tr>
 <td><strong>App Service image source</strong></td>
-<td>Direct pull from public <code>ghcr.io</code></td>
-<td>No ACR needed (~€5/mo saved + simpler deploy). Add ACR later if a tenant demands a private registry.</td>
+<td>Direct pull from public <code>ghcr.io</code> (default); the customer's own ACR with <code>containerRegistryResourceId</code></td>
+<td>No ACR needed by default (~€5/mo saved + simpler deploy). A tenant that wants its own copy of the images points the template at its ACR (typically a pull-through cache of ghcr.io), pulled with a dedicated AcrPull-only identity.</td>
+</tr>
+<tr>
+<td><strong>Report generator API key</strong></td>
+<td>Random, generated once by the deployment script, kept in KV</td>
+<td>It used to be a <code>newGuid()</code> template default, so every redeploy issued a new key and restarted both containers even when nothing else changed.</td>
 </tr>
 <tr>
 <td><strong>Worker model</strong></td>

@@ -1818,6 +1818,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/azure-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure as Code (GitOps)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/desktop-portable/" class="md-nav__link">
         
   
@@ -5429,6 +5457,13 @@
 current therefore means updating the branch those tags are cut from — which is
 what a <em>release line</em> is.</p>
 <p>Today that line is <strong><code>release/5.9</code></strong>, branched from <code>v5.9.1</code>.</p>
+<blockquote>
+<p><strong>Releasing this line is blocked by the main-first rule.</strong> The cut workflows
+now refuse any commit that is not on <code>main</code> (<code>tools/release/Assert-ReleaseFromMain.ps1</code>).
+The Dependabot updates merged into <code>release/5.9</code> are not on <code>main</code> and were
+not approved, so step 4 below no longer works. Whether to retire the line or
+give it a reviewed path onto <code>main</code> is still open.</p>
+</blockquote>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>v5.9.1 ──→ release/5.9 ──→ 5.9.2 ──→ 5.9.3 …     what customers run
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                ↑
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>     Dependabot lands production updates here, daily
