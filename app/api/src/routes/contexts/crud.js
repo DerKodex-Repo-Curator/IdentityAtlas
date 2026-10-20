@@ -45,19 +45,7 @@ router.post('/contexts', writeContexts, async (req, res) => {
          "parentContextId", "scopeSystemId", "createdByUser", "ownerUserId", "externalId",
          "contextCategory")
       VALUES ($1, 'manual', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [
-      id,
-      body.targetType,
-      body.contextType.slice(0, 100),
-      body.displayName.slice(0, 500),
-      body.description || null,
-      body.parentContextId || null,
-      body.scopeSystemId ? parseInt(body.scopeSystemId, 10) : null,
-      createdBy,
-      body.ownerUserId || null,
-      body.externalId || null,
-      resolved.contextCategory,
-    ]);
+    `, createInsertValues(id, body, createdBy, resolved.contextCategory));
 
     const row = await db.queryOne(`SELECT * FROM "Contexts" WHERE id = $1`, [id]);
     res.status(201).json(row);
@@ -66,6 +54,24 @@ router.post('/contexts', writeContexts, async (req, res) => {
     res.status(500).json({ error: 'Failed to create context' });
   }
 });
+
+// The INSERT's values for a new manual context, in column order; the body has
+// passed validateCreateContextBody, so targetType/contextType/displayName exist.
+function createInsertValues(id, body, createdBy, contextCategory) {
+  return [
+    id,
+    body.targetType,
+    body.contextType.slice(0, 100),
+    body.displayName.slice(0, 500),
+    body.description || null,
+    body.parentContextId || null,
+    body.scopeSystemId ? parseInt(body.scopeSystemId, 10) : null,
+    createdBy,
+    body.ownerUserId || null,
+    body.externalId || null,
+    contextCategory,
+  ];
+}
 
 // ─── PATCH /api/contexts/:id ─────────────────────────────────────────
 // Update a manual or generated context. Body keys: displayName, description,
