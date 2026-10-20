@@ -13,7 +13,8 @@
 import MatrixCard from './MatrixCard';
 import DownloadReportCard from './DownloadReportCard';
 
-const VIEW_IN_MATRIX = { key: 'view-in-matrix', Card: MatrixCard };
+// inApp: the card opens a page of the app, which a read-only shell cannot reach.
+const VIEW_IN_MATRIX = { key: 'view-in-matrix', Card: MatrixCard, inApp: true };
 const DOWNLOAD_REPORT = { key: 'download-report', Card: DownloadReportCard };
 
 const ACTIONS = {

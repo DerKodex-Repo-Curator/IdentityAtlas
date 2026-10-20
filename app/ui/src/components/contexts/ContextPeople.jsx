@@ -3,6 +3,7 @@ import { useAuth } from '@ui/auth/AuthGate';
 import { useFetch } from '@ui/hooks/useFetch';
 import { useHasPermission } from '@ui/auth/usePermissions';
 import { PencilIcon } from '@ui/components/admin/adminIcons';
+import { useIsSharedView } from '@ui/contexts/SharedViewContext';
 import ContextBestGuess from './ContextBestGuess';
 import ContextRoleModal from './ContextRoleModal';
 
@@ -23,6 +24,9 @@ import ContextRoleModal from './ContextRoleModal';
 // the heading when they draw their own, and turn on `suggest`: with no
 // Accountable set, the API's suggestion shows under it with Confirm / Not
 // this person / Choose someone else — the last opens the same modal.
+//
+// In a read-only shell (a context owner's page) the names are plain text and
+// there is no suggestion: the owner sees who answers for the unit, nothing to act on.
 
 const ROLED_CATEGORIES = new Set(['OrganizationalUnit', 'LogicalApplication']);
 
@@ -33,7 +37,9 @@ const ROLE_HELPERS = {
 
 export default function ContextPeople({ attrs, onOpenDetail, heading = 'People', accountableLabel = 'Accountable', noun = 'this unit', suggest = false }) {
   const { authFetch } = useAuth();
-  const canWrite = useHasPermission('data.write.contexts');
+  const readOnly = useIsSharedView();
+  const canWrite = useHasPermission('data.write.contexts') && !readOnly;
+  const openPerson = readOnly ? undefined : onOpenDetail;
   const enabled = ROLED_CATEGORIES.has(attrs?.contextCategory);
   const { data: roles, loading, error, reload } = useFetch(`/api/contexts/${attrs?.id}/roles`, { authFetch, enabled, initialData: [] });
   const [actionError, setActionError] = useState(null);
@@ -80,21 +86,21 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
   const responsible = list.filter(r => r.role === 'Responsible');
   const message = actionError || (error ? error.message : null);
   // Only once the roles have loaded: before that "no Accountable" is not known.
-  const showGuess = accountable.length === 0 && suggest && !loading && !error;
+  const showGuess = accountable.length === 0 && suggest && !readOnly && !loading && !error;
   const labelOf = (role) => (role === 'Accountable' ? accountableLabel : 'Responsible');
 
   return (
     <div className="mt-3 space-y-3" data-testid="context-people">
       {heading && <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">{heading}</div>}
       <RoleBlock label={accountableLabel} helper={ROLE_HELPERS.Accountable(noun)} holders={accountable} loading={loading}
-        canWrite={canWrite} onSet={() => open('Accountable')} onOpenDetail={onOpenDetail}>
+        canWrite={canWrite} onSet={() => open('Accountable')} onOpenDetail={openPerson}>
         {showGuess && (
           <ContextBestGuess contextId={attrs.id} canWrite={canWrite}
             onConfirm={holder => add('Accountable', holder)} onChooseOther={() => open('Accountable')} />
         )}
       </RoleBlock>
       <RoleBlock label="Responsible" helper={ROLE_HELPERS.Responsible(noun)} holders={responsible} loading={loading}
-        canWrite={canWrite} onSet={() => open('Responsible')} onOpenDetail={onOpenDetail} />
+        canWrite={canWrite} onSet={() => open('Responsible')} onOpenDetail={openPerson} />
       {message && !editing && (
         <div role="alert" className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-2 py-1">{message}</div>
       )}

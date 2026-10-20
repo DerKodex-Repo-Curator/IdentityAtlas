@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createElement as h } from 'react';
 import WorkflowsArea from './WorkflowsArea';
+import { SharedViewContext } from '@ui/contexts/SharedViewContext';
 import { renderWithProviders, makeAuthFetch, screen } from '@ui/test-utils/renderWithProviders';
 
 const APP = { id: 'c-app', displayName: 'SAP', contextCategory: 'LogicalApplication', targetType: 'Resource' };
@@ -13,8 +14,9 @@ const PPL_UNIT = { id: 'c-ppl', displayName: 'Finance', contextCategory: 'Organi
 const PPL_SELF = { id: 'c-ppl', displayName: 'Finance', targetType: 'Identity', self: true };
 const ACC_VARIANT = { id: 'c-acc', displayName: 'Finance accounts', targetType: 'Principal', self: false };
 
-function mount(attrs, { variants = [] } = {}) {
-  renderWithProviders(h(WorkflowsArea, { attrs, variants, variantsLoading: false, onOpenDetail: vi.fn() }), { auth: { authFetch: makeAuthFetch() } });
+function mount(attrs, { variants = [], readOnly = false } = {}) {
+  const area = h(WorkflowsArea, { attrs, variants, variantsLoading: false, onOpenDetail: vi.fn() });
+  renderWithProviders(readOnly ? h(SharedViewContext.Provider, { value: true }, area) : area, { auth: { authFetch: makeAuthFetch() } });
 }
 
 // The filter a matrix link carries, read back the way App.jsx reads it.
@@ -77,6 +79,19 @@ describe('WorkflowsArea (Actions)', () => {
 
   it('renders nothing for a template without actions', () => {
     mount({ ...ACC_UNIT, contextCategory: 'Tag' });
+    expect(screen.queryByRole('region', { name: 'Actions' })).toBeNull();
+  });
+
+  // A context owner's read-only page cannot open the matrix (its routes are 403
+  // for them): an application keeps only its report, a unit has no actions.
+  it('a read-only page drops the matrix card: an application keeps the report, a unit shows no Actions', () => {
+    mount(APP, { readOnly: true });
+    expect(screen.queryByRole('link', { name: 'View in matrix ↗' })).toBeNull();
+    expect(reportCard()).toBeInTheDocument();
+  });
+
+  it('a read-only org unit shows no Actions area at all', () => {
+    mount(ACC_UNIT, { readOnly: true });
     expect(screen.queryByRole('region', { name: 'Actions' })).toBeNull();
   });
 });
