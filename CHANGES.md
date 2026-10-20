@@ -1,5 +1,9 @@
 ## Changes in this PR
 
+- Every release now includes `IdentityAtlas-azure-<version>.zip`: the Azure template as it is at that release, set to deploy exactly that release's images by default. Keep it in your own repository to manage the deployment as code: the template and the images it runs can no longer drift apart, and an upgrade brings template changes and new images in together.
+
+## Changes in this PR
+
 - Azure: deploy an exact release with the new `imageTag` parameter (for example `6.0.2.0`). It applies to the web app, the worker and the report generator together, overrides `imageChannel`, and makes every deployment reproducible: upgrading or rolling back is a change to one value, and redeploying creates the new revision without a manual restart. Leaving it empty keeps today's behaviour.
 - Azure: pull the images from your own Azure Container Registry (for example a pull-through cache of ghcr.io) with the new `containerRegistryResourceId` parameter. The template creates a pull-only identity and grants it AcrPull on that registry.
 - Azure: redeploying no longer issues a new report generator API key every time, which restarted both containers even when nothing had changed. The key is now generated once and kept in Key Vault.
