@@ -5634,7 +5634,7 @@
 <ul>
 <li><code>feature/</code> branches must be branched off <code>main</code>.</li>
 <li><code>bugfixes/</code> branches branch from <code>main</code> for pre-release fixes. For hotfixes to an already-released version, branch from the release tag: <code>git checkout -b bugfixes/fix-foo v5.2.0</code>.</li>
-<li>Hotfix commits must be cherry-picked back to <code>main</code> via a separate PR so the fix is included in future releases.</li>
+<li><strong>Main first — nothing is released that is not on <code>main</code>.</strong> A hotfix is fixed on <code>main</code> (PR, approval, merge) before it is released; the hotfix branch holds only <code>git cherry-pick -x</code> copies of merged commits. The cut workflows enforce this.</li>
 <li>All merges to <code>main</code> go through a Pull Request — no direct pushes.</li>
 <li>Branch names: lowercase, hyphens. Examples: <code>feature/risk-score-export</code>, <code>bugfixes/fix-login-redirect</code>.</li>
 <li><strong>One issue per branch.</strong> Each branch fixes exactly one issue or implements exactly one feature. Never combine unrelated fixes into a single branch or PR.</li>
@@ -5763,37 +5763,32 @@ dependency-update list — is assembled by the workflow. See
 <p>Customers who track <code>:latest</code> will receive the new version on their next <code>docker compose pull</code>.</p>
 <hr />
 <h2 id="hotfix-releases">Hotfix Releases<a class="headerlink" href="#hotfix-releases" title="Permanent link">&para;</a></h2>
-<p>To ship a bugfix without including features already on <code>main</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># 1. Branch from the release tag — NOT from main</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>bugfixes/fix-login-crash<span class="w"> </span>v5.2.0
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># 2. Fix the bug, commit, push</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>bugfixes/fix-login-crash
+<p>To ship a bugfix without including features already on <code>main</code>, fix it on <code>main</code> <strong>first</strong>, then copy the merged commit onto the release:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># 1. Fix on main: bugfixes/fix-login-crash from main → PR → approval → merge</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># 2. Branch from the release tag — NOT from main — and cherry-pick the merged commit WITH -x</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>bugfixes/fix-login-crash-hotfix<span class="w"> </span>v5.2.0
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>git<span class="w"> </span>cherry-pick<span class="w"> </span>-x<span class="w"> </span>&lt;merged<span class="w"> </span>commit<span class="w"> </span>on<span class="w"> </span>main&gt;
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>bugfixes/fix-login-crash-hotfix
 </code></pre></div>
 <ol>
-<li>Go to <strong>Actions → Cut Hotfix → Run workflow</strong></li>
-<li>Enter the branch name (<code>bugfixes/fix-login-crash</code>) and new version (<code>5.2.1</code>)</li>
-<li>The workflow creates tag <code>v5.2.1</code> on the HEAD of your branch</li>
-<li><code>docker-publish.yml</code> builds <code>:latest</code> + <code>:5.2.1.0</code></li>
+<li>Go to <strong>Actions → Cut Hotfix → Run workflow</strong> (from <code>main</code>)</li>
+<li>Enter the branch name (<code>bugfixes/fix-login-crash-hotfix</code>) and new version (<code>5.2.1</code>)</li>
+<li>The workflow checks every commit after <code>v5.2.0</code> with <code>tools/release/Assert-ReleaseFromMain.ps1</code>: each must be on <code>main</code>, or a <code>-x</code> cherry-pick of a commit on <code>main</code> that changes exactly the same lines. Anything else — a fix written on the hotfix branch, a pick without <code>-x</code>, a conflict resolved by hand — stops the run before a tag exists.</li>
+<li>The workflow creates tag <code>v5.2.1</code> on the HEAD of your branch; <code>docker-publish.yml</code> builds <code>:latest</code> + <code>:5.2.1.0</code></li>
 </ol>
-<p>To cut a patch from a long-lived release branch such as <code>release/5.9</code>, dispatch the workflow <strong>from that branch</strong> so the branch's own copy runs. <code>main</code>'s copy calls scripts an older branch does not have, and stops before tagging when it finds them missing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>cut-hotfix.yml<span class="w"> </span>--ref<span class="w"> </span>release/5.9<span class="w"> </span>-f<span class="w"> </span><span class="nv">branch</span><span class="o">=</span>release/5.9<span class="w"> </span>-f<span class="w"> </span><span class="nv">version</span><span class="o">=</span><span class="m">5</span>.9.3
-</code></pre></div>
-<p>After the hotfix ships, open a PR to cherry-pick the fix into <code>main</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>pull
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>cherry-pick<span class="w"> </span>&lt;fix-commit-sha&gt;
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>gh<span class="w"> </span>pr<span class="w"> </span>create<span class="w"> </span>--base<span class="w"> </span>main<span class="w"> </span>--title<span class="w"> </span><span class="s2">"fix: cherry-pick hotfix from v5.2.1"</span>
-</code></pre></div>
+<p>If the cherry-pick conflicts, the resolution is code nobody reviewed: land a backport-specific fix on <code>main</code> that applies cleanly instead.</p>
+<p>Cut Release and Cut Beta likewise only tag a commit that is on <code>main</code>, and all three must be dispatched from <code>main</code> (they load the checker from their own commit, so a branch cannot ship an edited copy).</p>
 <hr />
 <h2 id="stacked-prs">Stacked PRs<a class="headerlink" href="#stacked-prs" title="Permanent link">&para;</a></h2>
 <p>For larger features, break the work into a stack of small focused PRs. Each PR targets the previous branch in the stack:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Step 1 — targets main</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/foo-step-1
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>gh<span class="w"> </span>pr<span class="w"> </span>create<span class="w"> </span>--base<span class="w"> </span>main<span class="w"> </span>--title<span class="w"> </span><span class="s2">"step 1: ..."</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># Step 2 — stacked on step 1</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/foo-step-2
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>gh<span class="w"> </span>pr<span class="w"> </span>create<span class="w"> </span>--base<span class="w"> </span>feature/foo-step-1<span class="w"> </span>--title<span class="w"> </span><span class="s2">"step 2: ..."</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Step 1 — targets main</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/foo-step-1
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>gh<span class="w"> </span>pr<span class="w"> </span>create<span class="w"> </span>--base<span class="w"> </span>main<span class="w"> </span>--title<span class="w"> </span><span class="s2">"step 1: ..."</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># Step 2 — stacked on step 1</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/foo-step-2
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>gh<span class="w"> </span>pr<span class="w"> </span>create<span class="w"> </span>--base<span class="w"> </span>feature/foo-step-1<span class="w"> </span>--title<span class="w"> </span><span class="s2">"step 2: ..."</span>
 </code></pre></div>
 <p>When a bottom PR merges, retarget the next one: <code>gh pr edit &lt;number&gt; --base main</code>.</p>
 <hr />

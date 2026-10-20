@@ -5695,15 +5695,12 @@ downloader needs. See
 <hr />
 <h2 id="where-releases-can-be-cut-from">Where releases can be cut from<a class="headerlink" href="#where-releases-can-be-cut-from" title="Permanent link">&para;</a></h2>
 <p>Both <code>cut-release</code> and <code>cut-beta</code> take a <strong><code>ref</code> input</strong> (branch, tag or commit;
-default <code>main</code>), and <code>cut-hotfix</code> takes a <strong>branch name</strong>. Nothing in the
-tooling requires a release to come from <code>main</code> HEAD — a release can be cut from
-a branch whose content was fixed at an earlier point.</p>
-<p>That capability is unused today. Whether to adopt it — a maintained
-<code>release/5.N</code> line with its own dependency updates and patch releases, versus
-releasing from <code>main</code> on a cadence — is an open policy question, not something
-this tooling decides. The notes machinery is correct either way: the baseline
-rule above was written specifically so a patch cut from a maintained line is
-described against its own line.</p>
+default <code>main</code>), and <code>cut-hotfix</code> takes a <strong>branch name</strong>. A release need not
+come from <code>main</code> HEAD, but everything in it must be <strong>on <code>main</code></strong>:
+<code>tools/release/Assert-ReleaseFromMain.ps1</code> refuses a <code>ref</code> that is not a commit
+on <code>main</code>, and a hotfix branch whose commits are not <code>-x</code> cherry-picks of
+commits on <code>main</code> (see the branching strategy). The notes machinery is correct
+either way: the baseline rule above describes a patch against its own line.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
