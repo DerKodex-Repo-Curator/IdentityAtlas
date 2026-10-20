@@ -1,21 +1,24 @@
 // Contexts tab — a sub-tab per template; in each, two panes: on the left the
-// tab's trees as one navigable tree (every root a top-level node, its subtree
-// read when expanded), on the right the selected context itself.
+// tab's trees grouped by where they come from (every root a top-level node, its
+// subtree read when expanded), on the right the selected unit itself. Trees are
+// changed in place only where the change persists (not an imported tree) and
+// only by a user holding data.write.contexts (with auth off, everyone).
 // See docs/architecture/context-redesign-ui.md for the design.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@ui/auth/AuthGate';
+import { useHasPermission } from '@ui/auth/usePermissions';
 import { useContextRoots, useContextForest } from '@ui/hooks/useContextTrees';
 import usePersistedState from '@ui/hooks/usePersistedState';
 import ContextDetailPage from './ContextDetailPage';
 import ContextTreeSelector from './contexts/ContextTreeSelector';
 import ContextTreeView from './contexts/ContextTreeView';
-import ContextTreeActions from './contexts/ContextTreeActions';
-import ContextListView from './contexts/ContextListView';
+import TreeRootMenu, { TreeStatus } from './contexts/ContextTreeActions';
 import NewContextWizard from './contexts/NewContextWizard';
 import TemplateTabs from './contexts/TemplateTabs';
 import { useContextTreeEdits, findNodeById } from './contexts/useContextTreeEdits';
 import { templateTabs, kindOptions, effectiveTab, effectiveKind, rootsForTab, tabOf } from './contexts/templateTabs.helpers';
+import { orderBySource, isEditableTree, rootKindSuffix } from './contexts/treePanel.helpers';
 import { viewKeyOf, selectedIdFor, forgetView, rootContaining, isMemberMovableTree } from './contexts/contextSelection.helpers';
 
 // The selection, remembered per tab (and Organisation kind) for the session.
@@ -57,8 +60,9 @@ function useContextSelection({ viewKey, visibleRoots, forestNodes, setChosenTab,
   return { selectedId, select, jumpTo, forget, onDetailLoaded };
 }
 
-// The forest drawn for the roots that passed the pane's filters. Memoised: the
-// tree re-seeds its expand state whenever its `nodes` change identity.
+// The forest drawn for one source group of the roots that passed the pane's
+// filters. Memoised: the tree re-seeds its expand state whenever its `nodes`
+// change identity.
 function ContextForestTree({ roots, forestNodes, ...props }) {
   const nodes = useMemo(() => {
     const ids = new Set(roots.map(r => r.id));
@@ -69,25 +73,26 @@ function ContextForestTree({ roots, forestNodes, ...props }) {
 
 export default function ContextsPage({ onOpenDetail, onNavigate }) {
   const { authFetch } = useAuth();
+  const canWrite = useHasPermission('data.write.contexts');
   const { roots, loading: rootsLoading, error: rootsError, reload: reloadRoots } = useContextRoots();
-  const [viewMode, setViewMode] = useState('tree');
   const [newModalOpen, setNewModalOpen] = useState(false);
-  // Sub-tab per template; in Organisation, which kind of tree (People ·
-  // Accounts · Resources). Null = not chosen yet, so the first tab with trees.
+  // Sub-tab per template; in Organisation, which kind of member the trees hold
+  // (People · Accounts · Resources — only the kinds that have trees). Null =
+  // not chosen yet, so the first tab with trees and the first kind offered.
   const [chosenTab, setChosenTab] = useState(null);
   const [chosenKind, setChosenKind] = useState(null);
   const tabs = useMemo(() => templateTabs(roots), [roots]);
   const kinds = useMemo(() => kindOptions(roots), [roots]);
   const activeTab = effectiveTab(tabs, chosenTab);
   const activeKind = effectiveKind(kinds, chosenKind);
-  const visibleRoots = useMemo(() => rootsForTab(roots, activeTab, activeKind), [roots, activeTab, activeKind]);
+  // In the order the panel lists them, so the first root is the first one shown.
+  const visibleRoots = useMemo(() => orderBySource(rootsForTab(roots, activeTab, activeKind)), [roots, activeTab, activeKind]);
   const forest = useContextForest(visibleRoots);
   const selection = useContextSelection({
     viewKey: viewKeyOf(activeTab, activeKind), visibleRoots, forestNodes: forest.nodes, setChosenTab, setChosenKind,
   });
   const { selectedId } = selection;
-  const treeRoot = rootContaining(forest.nodes, selectedId);
-  const treeRootId = treeRoot?.id;
+  const treeRootId = rootContaining(forest.nodes, selectedId)?.id;
   // Bumped after a tree edit, so the detail on the right re-reads the context.
   const [detailVersion, setDetailVersion] = useState(0);
 
@@ -114,66 +119,58 @@ export default function ContextsPage({ onOpenDetail, onNavigate }) {
     else onOpenDetail?.(kind, id, name);
   }
 
-  const tabLabel = tabs.find(t => t.key === activeTab)?.label;
+  // The edit callbacks a tree gets when its edits persist and the user may
+  // write; a reader (or an imported tree) gets none, so no +, rename, drag or ⋯.
+  function editProps(variant) {
+    if (!isEditableTree(variant, canWrite)) return {};
+    return {
+      onReparent: edits.reparent,
+      onRename: edits.rename,
+      onAddChild: edits.addChild,
+      onMoveMember: edits.moveMember,
+      renderRootActions: (root) => {
+        const suffix = rootKindSuffix(activeTab, root);
+        return (
+          <TreeRootMenu
+            root={root} label={suffix ? `${root.displayName} · ${suffix}` : undefined}
+            onRefresh={edits.syncTree} refreshing={edits.syncing} onDelete={edits.deleteTree}
+          />
+        );
+      },
+    };
+  }
 
-  function renderTree(filtered) {
+  function renderTree(groupRoots, group) {
     return (
-      <>
-        {treeRoot && (
-          <ContextTreeActions
-            root={treeRoot}
-            viewMode={viewMode}
-            onChangeViewMode={setViewMode}
-            onDeleteTree={edits.deleteTree}
-            deleteError={edits.deleteError}
-            onSyncTree={edits.syncTree}
-            syncing={edits.syncing}
-            syncMsg={edits.syncMsg}
-          />
-        )}
-        {edits.editError && (
-          <div className="mx-3 mt-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-2 py-1">
-            {edits.editError}
-          </div>
-        )}
-        {viewMode === 'tree' ? (
-          <ContextForestTree
-            roots={filtered}
-            forestNodes={forest.nodes}
-            selectedId={selectedId}
-            onSelect={selection.select}
-            onExpandNode={loadRoot}
-            onReparent={edits.reparent}
-            onRename={edits.rename}
-            onAddChild={edits.addChild}
-            onLoadMembers={edits.loadMembers}
-            onOpenMember={(id, name, kind) => onOpenDetail?.(kind || 'user', id, name)}
-            onMoveMember={edits.moveMember}
-          />
-        ) : (
-          <ContextListView nodes={treeRoot ? [treeRoot] : []} onOpenDetail={(id) => selection.select(id)} />
-        )}
-      </>
+      <ContextForestTree
+        roots={groupRoots}
+        forestNodes={forest.nodes}
+        selectedId={selectedId}
+        onSelect={selection.select}
+        onExpandNode={loadRoot}
+        onLoadMembers={edits.loadMembers}
+        onOpenMember={(id, name, kind) => onOpenDetail?.(kind || 'user', id, name)}
+        rootSuffix={(root) => rootKindSuffix(activeTab, root)}
+        {...editProps(group?.variant)}
+      />
     );
   }
 
   return (
     <div className="flex flex-col h-[calc(100vh-180px)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <TemplateTabs
-        tabs={tabs}
-        active={activeTab}
-        onChange={setChosenTab}
-        kinds={kinds}
-        kind={activeKind}
-        onKindChange={setChosenKind}
-      />
+      <TemplateTabs tabs={tabs} active={activeTab} onChange={setChosenTab} />
       <div className="flex flex-1 min-h-0">
         <div className="w-96 flex-shrink-0">
           <ContextTreeSelector
-            title={tabLabel}
+            title={tabs.find(t => t.key === activeTab)?.label}
+            tab={activeTab}
+            kinds={activeTab === 'OrganizationalUnit' ? kinds : null}
+            kind={activeKind}
+            onKindChange={setChosenKind}
             roots={visibleRoots}
             renderTree={renderTree}
-            onNewTree={() => setNewModalOpen(true)}
+            notice={<TreeStatus syncing={edits.syncing} syncMsg={edits.syncMsg} errors={[edits.editError, edits.deleteError]} />}
+            onNewTree={canWrite ? () => setNewModalOpen(true) : undefined}
             onOpenContext={(id) => selection.jumpTo(id)}
             loading={rootsLoading}
           />
@@ -187,8 +184,8 @@ export default function ContextsPage({ onOpenDetail, onNavigate }) {
           )}
 
           {!selectedId && !rootsLoading && (
-            <div className="h-full flex items-center justify-center p-8 text-sm text-gray-500 dark:text-gray-400">
-              Select a tree on the left, or click <span className="font-semibold mx-1">+ New</span> to create one.
+            <div className="h-full flex items-center justify-center p-8 text-sm text-gray-600 dark:text-gray-400">
+              Pick a unit on the left.
             </div>
           )}
 
@@ -218,7 +215,7 @@ export default function ContextsPage({ onOpenDetail, onNavigate }) {
           if (created?.id) selection.jumpTo(created.id);
         }}
         onRunStarted={(runId) => {
-          if (runId) onOpenDetail?.('run', runId, 'Plugin run');
+          if (runId) onOpenDetail?.('run', runId, 'Rule run');
         }}
         onOpenCrawlers={() => onNavigate?.('admin')}
         onOpenBuilder={() => onOpenDetail?.('context-builder', `new-${Date.now()}`, 'New context')}

@@ -2,15 +2,15 @@ import { useCallback, useState } from 'react';
 import { useAuth } from '@ui/auth/AuthGate';
 import { useFetch } from '@ui/hooks/useFetch';
 
-// ─── Best guess for the Accountable ──────────────────────────────────────
-// Shown inside the Accountable fact while nobody holds that role. The API
-// names one candidate and why (GET /api/contexts/:id/roles/suggestion → the
-// candidate, or 204 for none): the manager of most members of a people unit,
-// the owner of most resources of an application. The analyst can:
+// ─── Suggested Accountable ───────────────────────────────────────────────
+// Shown under the Accountable role while nobody holds it. The API names one
+// candidate and why (GET /api/contexts/:id/roles/suggestion → the candidate,
+// or 204 for none): the manager of most members of a people unit, the owner of
+// most resources of an application. Someone who can edit contexts can:
 //   Confirm             — sets the role (the caller PUTs it and refreshes)
-//   Reject              — remembered by the API, never suggested again here
+//   Not this person     — remembered by the API, never suggested again here
 //   Choose someone else — opens the Accountable modal (ContextRoleModal)
-// A reader sees the guess and its reason, without the buttons.
+// A reader sees the suggestion and its reason, without the buttons.
 
 // 204 has no body; turn it into "no suggestion" so useFetch can parse it.
 function useSuggestionFetch(authFetch) {
@@ -52,7 +52,7 @@ export default function ContextBestGuess({ contextId, canWrite, onConfirm, onCho
         throw new Error(body.error || `HTTP ${r.status}`);
       }
       setRejected(true);
-    } catch (e) { setActionError(e.message || 'Reject failed'); }
+    } catch (e) { setActionError(e.message || 'Could not record that'); }
     finally { setBusy(false); }
   }
 
@@ -62,19 +62,19 @@ export default function ContextBestGuess({ contextId, canWrite, onConfirm, onCho
     setBusy(false);
   }
 
-  const btn = 'px-1.5 py-0.5 rounded text-[11px] disabled:opacity-50';
+  const btn = 'px-2 py-0.5 rounded text-xs disabled:opacity-50';
   return (
-    <span data-testid="best-guess" className="inline-flex flex-wrap items-center gap-1 rounded border border-dashed border-blue-300 bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-900 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-200">
-      <span>Best guess: <strong className="font-semibold">{name}</strong></span>
-      {suggestion.reason && <span className="text-blue-800 dark:text-blue-300">({suggestion.reason})</span>}
+    <div data-testid="best-guess" className="flex flex-wrap items-center gap-1.5 rounded border border-dashed border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200">
+      <span><span className="font-semibold">Suggested:</span> {name}</span>
+      {suggestion.reason && <span className="text-gray-600 dark:text-gray-400">· {suggestion.reason}</span>}
       {canWrite && (
         <>
           <button type="button" onClick={confirm} disabled={busy} className={`${btn} bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600`}>Confirm</button>
-          <button type="button" onClick={reject} disabled={busy} className={`${btn} bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600`}>Reject</button>
+          <button type="button" onClick={reject} disabled={busy} className={`${btn} bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600`}>Not this person</button>
           <button type="button" onClick={onChooseOther} className={`${btn} text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200`}>Choose someone else</button>
         </>
       )}
       {actionError && <span role="alert" className="text-red-700 dark:text-red-400">{actionError}</span>}
-    </span>
+    </div>
   );
 }

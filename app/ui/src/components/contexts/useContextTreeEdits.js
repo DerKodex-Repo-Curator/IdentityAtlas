@@ -59,11 +59,11 @@ export function useContextTreeEdits({ authFetch, nodes, refresh, onTreeDeleted }
   // keeping all analyst edits. We poll the queued run, then refresh the view.
   async function syncTree(rootId) {
     setSyncing(true); setSyncMsg(null);
-    await edit('Sync failed', async () => {
+    await edit('Refresh failed', async () => {
       const r = await authFetch(`/api/contexts/${rootId}/sync`, { method: 'POST' });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
-      if (await waitForRun(authFetch, body.runId) === 'failed') throw new Error('Sync run failed — see the run log.');
+      if (await waitForRun(authFetch, body.runId) === 'failed') throw new Error('Refresh failed — see the run log.');
       setSyncMsg('Synced');
       setTimeout(() => setSyncMsg(null), 2500);
     });

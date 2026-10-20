@@ -15,12 +15,14 @@ import {
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
 
 // Three organisation roots: a generated people tree from the manager-hierarchy
-// plugin (selectable, deletable, syncable), a synced people tree (delete
-// blocked by the API) and an accounts tree — the generated tree's variant.
+// rule (selectable, deletable, refreshable), a synced people tree (read-only:
+// the next import would overwrite an edit) and an accounts tree — the
+// generated tree's variant.
 const GEN = {
   id: 'root-gen', displayName: 'Engineering Org', variant: 'generated', targetType: 'Identity',
   contextType: 'ManagerHierarchy', contextCategory: 'OrganizationalUnit',
   sourceAlgorithmName: 'manager-hierarchy', sourceAlgorithmDisplayName: 'Manager Hierarchy',
+  scopeSystemId: 5, scopeSystemName: 'Entra ID',
   directMemberCount: 1, totalMemberCount: 4,
 };
 const SYNCED = {
@@ -35,6 +37,7 @@ const ACC = {
   id: 'root-acc', displayName: 'Engineering Org', variant: 'generated', targetType: 'Principal',
   contextType: 'ManagerHierarchy', contextCategory: 'OrganizationalUnit', directMemberCount: 7, totalMemberCount: 7,
 };
+// GEN is listed first by the API; the panel still lists the imported tree first.
 const ROOTS = [GEN, SYNCED, ACC];
 
 const child = (id, displayName, extra = {}) => ({
@@ -80,45 +83,81 @@ function api({ roots = ROOTS, answer = () => undefined } = {}) {
   });
 }
 
-function mount({ onOpenDetail = vi.fn(), ...opts } = {}) {
+// A reader: signed in, may read contexts but not change them.
+const READER = { hasWildcard: false, permissions: new Set(['data.read.contexts']) };
+
+// `select` = the people tree the session remembers as selected (null = none,
+// so the page opens on the first tree it lists).
+function mount({ onOpenDetail = vi.fn(), select = 'root-gen', auth = {}, ...opts } = {}) {
+  if (select) sessionStorage.setItem('iatlas.contexts.selected', JSON.stringify({ 'OrganizationalUnit:Identity': select }));
   const authFetch = api(opts);
-  renderWithProviders(h(ContextsPage, { onOpenDetail }), { auth: { authFetch } });
+  renderWithProviders(h(ContextsPage, { onOpenDetail }), { auth: { authFetch, ...auth } });
   return { authFetch, onOpenDetail, user: userEvent.setup() };
 }
 
 const detailPane = () => screen.getByTestId('context-detail-pane');
+const pane = () => screen.getByTestId('context-tree-pane');
 // The context the right pane shows: its header's heading.
 const shownContext = async (name) => {
   await waitFor(() => expect(within(detailPane()).getByRole('heading', { level: 2 })).toHaveTextContent(name));
 };
-// A node of the left tree, by its name (the chip carries the name and badges).
-const node = (name) => {
-  const pane = screen.queryByTestId('context-detail-pane');
-  return screen.getAllByRole('button').find(b =>
-    b.closest('li') && !pane?.contains(b) && !b.hasAttribute('aria-expanded') && b.textContent.startsWith(name));
-};
-// The left tree (its top-level list), to keep member ovals apart from the detail's members table.
-const tree = () => node('Engineering Org').closest('ul');
+// A node of the left tree, by its name (the chip carries the name and the count).
+const node = (name) => within(pane()).getAllByRole('button').find(b =>
+  b.closest('li') && !b.hasAttribute('aria-expanded') && !b.hasAttribute('aria-haspopup') && b.textContent.startsWith(name));
+// The left tree under one source heading, to keep member ovals apart from the detail's members table.
+const group = (heading) => screen.getByRole('region', { name: heading });
 const treeCalls = (authFetch) => authFetch.mock.calls.map(([u]) => String(u)).filter(u => u.startsWith('/api/contexts/tree'));
+const menuFor = (name) => screen.queryByRole('button', { name: `Actions for ${name}` });
 
 describe('ContextsPage — the tree on the left', () => {
-  it('lists every root of the tab as a top-level node and opens on the first, reading only its subtree', async () => {
-    const { authFetch } = mount();
-    // Both people trees are top-level nodes; the accounts tree waits behind the kind switch.
-    expect(await screen.findByText('Sales OUs')).toBeInTheDocument();
+  it('groups the roots under a heading per source, imported first, and drops the caption line', async () => {
+    mount();
     expect(await screen.findByText('Backend Squad')).toBeInTheDocument();
-    expect(screen.getByText('Frontend Squad')).toBeInTheDocument();
+    const headings = within(pane()).getAllByRole('heading', { level: 3 }).map(x => x.textContent);
+    expect(headings).toEqual(['Imported · Active Directory', 'Manager hierarchy · Entra ID']);
+    expect(within(group('Imported · Active Directory')).getByText('Sales OUs')).toBeInTheDocument();
+    expect(within(group('Manager hierarchy · Entra ID')).getByText('Engineering Org')).toBeInTheDocument();
+    expect(screen.queryByTitle('Where these trees come from')).toBeNull();
+  });
+
+  it('opens on the first tree it lists when nothing is remembered — the imported one', async () => {
+    const { authFetch } = mount({ select: null });
+    await shownContext('Sales OUs');
+    expect(node('Sales OUs')).toHaveAttribute('aria-current', 'true');
+    expect(treeCalls(authFetch)).toEqual(['/api/contexts/tree?root=root-synced']);
+  });
+
+  it('reads only the selected root\'s subtree; the other root waits collapsed', async () => {
+    const { authFetch } = mount();
+    expect(await screen.findByText('Backend Squad')).toBeInTheDocument();
     expect(node('Engineering Org')).toHaveAttribute('aria-current', 'true');
     await shownContext('Engineering Org');
-    // Only the selected root's subtree was read; the other root is still collapsed.
     expect(treeCalls(authFetch)).toEqual(['/api/contexts/tree?root=root-gen']);
     expect(screen.queryByText('EMEA Sales')).toBeNull();
     expect(screen.getByRole('button', { name: 'Expand Sales OUs' })).toHaveAttribute('aria-expanded', 'false');
-    // The tree that holds the selection offers its actions.
-    expect(screen.getByText('Sync')).toBeInTheDocument();
-    expect(screen.getByText('Delete tree…')).toBeInTheDocument();
-    // The pane is captioned with where the trees come from.
-    expect(screen.getByTitle('Where these trees come from')).toHaveTextContent('Manager Hierarchy · Active Directory');
+  });
+
+  it('shows one count per row, split in its title, and no kind badge inside Organisation', async () => {
+    mount();
+    await screen.findByText('Backend Squad');
+    const row = node('Engineering Org');
+    expect(within(row).getByTitle('4 people (1 directly in this unit)')).toHaveTextContent('4');
+    // A leaf: everyone is direct, so the title has no split.
+    expect(within(node('Frontend Squad')).getByTitle('1 person')).toBeInTheDocument();
+    // The direct count (1) is not drawn beside the total any more.
+    expect(row.textContent).toBe('Engineering Org, 4 people (1 directly in this unit)4');
+    for (const word of ['Identity', 'Principal', 'People', 'Generated', 'Synced']) {
+      expect(within(pane()).queryByText(word, { selector: 'li *' })).toBeNull();
+    }
+  });
+
+  it('never marks a row\'s select button aria-disabled (the drag ARIA is not spread on it)', async () => {
+    mount();
+    await screen.findByText('Backend Squad');
+    for (const name of ['Engineering Org', 'Backend Squad', 'Sales OUs']) {
+      expect(node(name)).not.toHaveAttribute('aria-disabled');
+      expect(node(name)).not.toHaveAttribute('aria-roledescription');
+    }
   });
 
   it('expanding a root reads its subtree then, and only once', async () => {
@@ -127,13 +166,12 @@ describe('ContextsPage — the tree on the left', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
     expect(await screen.findByText('EMEA Sales')).toBeInTheDocument();
     expect(treeCalls(authFetch)).toEqual(['/api/contexts/tree?root=root-gen', '/api/contexts/tree?root=root-synced']);
-    // Collapse and expand again: no second read.
     await user.click(screen.getByRole('button', { name: 'Collapse Sales OUs' }));
     expect(screen.queryByText('EMEA Sales')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
     expect(await screen.findByText('EMEA Sales')).toBeInTheDocument();
     expect(treeCalls(authFetch)).toHaveLength(2);
-    // Expanding does not select: the right pane still shows the first root.
+    // Expanding does not select: the right pane still shows the remembered root.
     await shownContext('Engineering Org');
   });
 
@@ -145,8 +183,6 @@ describe('ContextsPage — the tree on the left', () => {
     expect(node('Backend Squad')).toHaveAttribute('aria-current', 'true');
     expect(node('Engineering Org')).not.toHaveAttribute('aria-current');
     expect(onOpenDetail).not.toHaveBeenCalled();
-    // The tree actions stay with the tree that holds the selection.
-    expect(screen.getByText('Sync')).toBeInTheDocument();
   });
 
   it('"Open as page" opens the shown context in its own tab', async () => {
@@ -156,27 +192,13 @@ describe('ContextsPage — the tree on the left', () => {
     await shownContext('Backend Squad');
     await user.click(within(detailPane()).getByRole('button', { name: 'Open as page' }));
     expect(onOpenDetail).toHaveBeenCalledWith('context', 'child-backend', 'Backend Squad');
-    // Embedded, the detail has no close button.
     expect(within(detailPane()).queryByTitle('Close')).toBeNull();
-  });
-
-  it('selecting the synced root hides the sync/delete affordances', async () => {
-    const { user } = mount();
-    await screen.findByText('Backend Squad');
-    await user.click(node('Sales OUs'));
-    await shownContext('Sales OUs');
-    // Selecting a root also reads its subtree, so it opens.
-    expect(await screen.findByText('EMEA Sales')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tree' })).toBeInTheDocument();
-    expect(screen.queryByText('Sync')).not.toBeInTheDocument();
-    expect(screen.queryByText('Delete tree…')).not.toBeInTheDocument();
   });
 
   it('shows the selected tree owner as a person and opens that account in a tab', async () => {
     const { onOpenDetail, user } = mount();
     await screen.findByText('Backend Squad');
     await user.click(node('Sales OUs'));
-    // The person, not the external id the source stored.
     const owner = await within(detailPane()).findByTitle('Owner id: IIQ-4711');
     expect(owner.textContent).toContain('Leo M. Cohen');
     expect(owner.textContent).not.toContain('IIQ-4711');
@@ -184,18 +206,27 @@ describe('ContextsPage — the tree on the left', () => {
     expect(onOpenDetail).toHaveBeenCalledWith('user', 'p-owner', 'Leo M. Cohen');
   });
 
-  it('remembers the selection per kind of tree', async () => {
+  it('the Show switch sits in the panel header and remembers the selection per kind', async () => {
     const { user } = mount();
     await screen.findByText('Backend Squad');
     await user.click(node('Backend Squad'));
     await shownContext('Backend Squad');
-    const kinds = screen.getByRole('group', { name: 'Kind of unit' });
-    await user.click(within(kinds).getByRole('button', { name: /^Accounts/ }));
+    const kinds = within(pane()).getByRole('group', { name: 'Show' });
+    // Only the kinds that have trees: no Resources here.
+    expect(within(kinds).getAllByRole('button').map(b => b.textContent)).toEqual(['People', 'Accounts']);
+    await user.click(within(kinds).getByRole('button', { name: 'Accounts' }));
     await waitFor(() => expect(node('Engineering Org')).toHaveAttribute('aria-current', 'true'));
     expect(screen.queryByText('Sales OUs')).toBeNull();
-    await user.click(within(kinds).getByRole('button', { name: /^People/ }));
+    await user.click(within(kinds).getByRole('button', { name: 'People' }));
     await shownContext('Backend Squad');
     expect(node('Backend Squad')).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('has no List mode: the panel is the tree', async () => {
+    mount();
+    await screen.findByText('Backend Squad');
+    expect(screen.queryByRole('button', { name: 'List' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Tree' })).toBeNull();
   });
 });
 
@@ -203,21 +234,58 @@ describe('ContextsPage — links inside the detail', () => {
   it('a variant link selects that context in place and switches the kind of tree', async () => {
     const { onOpenDetail, user } = mount();
     await shownContext('Engineering Org');
-    // Scoped to the variants block: a role query over the whole page is slow.
     const variants = await screen.findByTestId('unit-variants');
-    await user.click(await within(variants).findByRole('button', { name: 'Accounts 7' }));
-    // The accounts tree is now the one on the left, its root selected and shown.
-    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Kind of unit' })).getByRole('button', { name: /^Accounts/ })).toHaveAttribute('aria-pressed', 'true'));
+    await user.click(await within(variants).findByRole('button', { name: /^Accounts/ }));
+    await waitFor(() => expect(within(within(pane()).getByRole('group', { name: 'Show' })).getByRole('button', { name: 'Accounts' })).toHaveAttribute('aria-pressed', 'true'));
     await waitFor(() => expect(node('Engineering Org')).toHaveAttribute('aria-current', 'true'));
     expect(screen.queryByText('Sales OUs')).toBeNull();
-    // The accounts variant is shown, with its people variant now the other choice.
-    await waitFor(() => expect(within(screen.getByTestId('unit-variants')).getByRole('button', { name: /^Accounts/ })).toHaveAttribute('aria-pressed', 'true'));
     expect(onOpenDetail).not.toHaveBeenCalledWith('context', expect.anything(), expect.anything());
   });
 });
 
+describe('ContextsPage — who may change a tree', () => {
+  it('an imported tree offers no ⋯ menu, no add-sub-unit and no rename', async () => {
+    const { authFetch, user } = mount();
+    await screen.findByText('Backend Squad');
+    // The derived tree beside it does.
+    expect(menuFor('Engineering Org')).toBeInTheDocument();
+    expect(menuFor('Sales OUs')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
+    await screen.findByText('EMEA Sales');
+    const synced = group('Imported · Active Directory');
+    expect(within(synced).queryByRole('button', { name: 'Add a sub-unit' })).toBeNull();
+    expect(within(group('Manager hierarchy · Entra ID')).getAllByRole('button', { name: 'Add a sub-unit' }).length).toBeGreaterThan(0);
+    await user.dblClick(node('EMEA Sales'));
+    expect(screen.queryByRole('textbox', { name: 'Unit name' })).toBeNull();
+    expect(authFetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(false);
+  });
+
+  it('a user without data.write.contexts gets no +, rename, ⋯, member drag or + New', async () => {
+    const { user } = mount({ auth: READER });
+    await screen.findByText('Backend Squad');
+    expect(menuFor('Engineering Org')).toBeNull();
+    expect(within(pane()).queryByRole('button', { name: 'Add a sub-unit' })).toBeNull();
+    expect(within(pane()).queryByRole('button', { name: '+ New' })).toBeNull();
+    await user.dblClick(node('Backend Squad'));
+    expect(screen.queryByRole('textbox', { name: 'Unit name' })).toBeNull();
+    // The members still open, but nobody can drag one to another team.
+    await user.click(within(group('Manager hierarchy · Entra ID')).getAllByRole('button', { name: /^Show the people directly in/ })[0]);
+    expect(await within(group('Manager hierarchy · Entra ID')).findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.queryByTitle(/drag onto another team to move/)).toBeNull();
+  });
+
+  it('the same user with the permission gets them back', async () => {
+    mount({ auth: { hasWildcard: false, permissions: new Set(['data.write.contexts']) } });
+    await screen.findByText('Backend Squad');
+    expect(menuFor('Engineering Org')).toBeInTheDocument();
+    expect(within(pane()).getByRole('button', { name: '+ New' })).toBeInTheDocument();
+  });
+});
+
 describe('ContextsPage — editing the tree', () => {
-  it('runs the delete-tree confirm flow, calls DELETE and falls back to the next tree', async () => {
+  const openMenu = async (user, name) => { await user.click(menuFor(name)); return screen.getByRole('menu', { name: `Actions for ${name}` }); };
+
+  it('Delete this tree… asks first, then calls DELETE and falls back to the next tree', async () => {
     let deleted = false;
     const { authFetch, user } = mount({
       answer: (u, opts) => {
@@ -227,15 +295,28 @@ describe('ContextsPage — editing the tree', () => {
       },
     });
     await screen.findByText('Backend Squad');
-    await user.click(screen.getByText('Delete tree…'));
-    expect(await screen.findByText('Yes, delete')).toBeInTheDocument();
-    // Cancel first to exercise that branch.
-    await user.click(screen.getByText('Cancel'));
-    expect(screen.queryByText('Yes, delete')).not.toBeInTheDocument();
-    await user.click(screen.getByText('Delete tree…'));
-    await user.click(await screen.findByText('Yes, delete'));
+    // A manager-hierarchy tree is derived: Refresh and Delete.
+    let menu = await openMenu(user, 'Engineering Org');
+    expect(within(menu).getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Refresh', 'Delete this tree…']);
+    await user.click(within(menu).getByRole('menuitem', { name: 'Delete this tree…' }));
+    expect(await screen.findByText(/Delete "Engineering Org" and every unit under it\?/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(authFetch.mock.calls.some(([, o]) => o?.method === 'DELETE')).toBe(false);
+
+    menu = await openMenu(user, 'Engineering Org');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Delete this tree…' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(authFetch).toHaveBeenCalledWith('/api/contexts/root-gen', expect.objectContaining({ method: 'DELETE' }));
     await shownContext('Sales OUs');
+  });
+
+  it('a tree created here offers Delete but not Refresh', async () => {
+    const MANUAL = { ...GEN, id: 'root-man', displayName: 'Projects', variant: 'manual', sourceAlgorithmName: null };
+    const { user } = mount({ roots: [MANUAL], select: null });
+    await waitFor(() => expect(menuFor('Projects')).toBeInTheDocument());
+    expect(within(pane()).getByRole('heading', { level: 3 })).toHaveTextContent('Created here');
+    const menu = await openMenu(user, 'Projects');
+    expect(within(menu).getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Delete this tree…']);
   });
 
   it('surfaces a delete error when the API rejects', async () => {
@@ -243,60 +324,65 @@ describe('ContextsPage — editing the tree', () => {
       answer: (u, opts) => (opts.method === 'DELETE' ? jsonResponse({ error: 'tree is synced' }, { ok: false, status: 409 }) : undefined),
     });
     await screen.findByText('Backend Squad');
-    await user.click(screen.getByText('Delete tree…'));
-    await user.click(await screen.findByText('Yes, delete'));
+    await user.click(within(await openMenu(user, 'Engineering Org')).getByRole('menuitem', { name: 'Delete this tree…' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('tree is synced')).toBeInTheDocument();
   });
 
-  it('runs the Sync flow on a generated tree and re-reads the tree and the detail', async () => {
+  it('Refresh re-runs the rule and re-reads the tree and the detail', async () => {
     const { authFetch, user } = mount({ answer: (u, opts) => (u.includes('/sync') && opts.method === 'POST' ? { ok: true } : undefined) });
     await shownContext('Engineering Org');
     const detailReads = () => authFetch.mock.calls.filter(([u]) => u === '/api/contexts/root-gen').length;
     const before = detailReads();
-    await user.click(screen.getByRole('button', { name: /Sync/i }));
-    await waitFor(() => expect(screen.getAllByText('Synced').some(el => el.className.includes('text-green-700'))).toBe(true));
+    await user.click(within(await openMenu(user, 'Engineering Org')).getByRole('menuitem', { name: 'Refresh' }));
+    expect(await screen.findByText('Refreshed')).toBeInTheDocument();
     expect(authFetch).toHaveBeenCalledWith('/api/contexts/root-gen/sync', expect.objectContaining({ method: 'POST' }));
     expect(treeCalls(authFetch).filter(u => u.endsWith('root-gen'))).toHaveLength(2);
     await waitFor(() => expect(detailReads()).toBe(before + 1));
   });
 
-  it('shows the API error when a sync is refused', async () => {
-    const { user } = mount({ answer: (u, opts) => (u.includes('/sync') && opts.method === 'POST' ? jsonResponse({ error: 'plugin disabled' }, { ok: false, status: 409 }) : undefined) });
+  it('shows the API error when a refresh is refused', async () => {
+    const { user } = mount({ answer: (u, opts) => (u.includes('/sync') && opts.method === 'POST' ? jsonResponse({ error: 'rule disabled' }, { ok: false, status: 409 }) : undefined) });
     await screen.findByText('Backend Squad');
-    await user.click(screen.getByRole('button', { name: /Sync/i }));
-    expect(await screen.findByText('plugin disabled')).toBeInTheDocument();
+    await user.click(within(await openMenu(user, 'Engineering Org')).getByRole('menuitem', { name: 'Refresh' }));
+    expect(await screen.findByText('rule disabled')).toBeInTheDocument();
   });
 
   it('lazy-loads a node\'s members, and lets a person be dragged only in the manager-hierarchy tree', async () => {
     const { authFetch, user } = mount();
     await screen.findByText('Backend Squad');
-    await user.click(screen.getAllByTitle(/Show the users directly in this context/i)[0]);
-    expect(await within(tree()).findByTitle('Ada Lovelace — drag onto another team to move')).toBeInTheDocument();
+    const mh = group('Manager hierarchy · Entra ID');
+    const toggle = within(mh).getByRole('button', { name: 'Show the people directly in Engineering Org' });
+    // The expander does not repeat the row's count.
+    expect(toggle.textContent).not.toMatch(/\d/);
+    await user.click(toggle);
+    expect(await within(mh).findByTitle('Ada Lovelace — drag onto another team to move')).toBeInTheDocument();
     expect(authFetch).toHaveBeenCalledWith('/api/contexts/root-gen/members?limit=200');
+    expect(within(mh).getByRole('button', { name: 'Hide the people directly in Engineering Org' })).toHaveAttribute('aria-expanded', 'true');
 
-    // The synced tree beside it, from another source: its members stay put.
-    await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
-    await screen.findByText('EMEA Sales');
-    const salesToggle = within(node('Sales OUs').closest('div')).getByTitle(/Show the users directly in this context/i);
-    await user.click(salesToggle);
-    await waitFor(() => expect(within(tree()).getAllByText('Ada Lovelace')).toHaveLength(2));
-    expect(within(tree()).getAllByTitle(/drag onto another team to move/)).toHaveLength(1);
+    // The imported tree beside it: its members stay put.
+    await user.click(screen.getByRole('button', { name: 'Show the people directly in Sales OUs' }));
+    const synced = group('Imported · Active Directory');
+    expect(await within(synced).findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(within(synced).queryByTitle(/drag onto another team to move/)).toBeNull();
   });
 
-  it('enables member moves on the plugin that produced the tree, not on the type name', async () => {
-    const otherPlugin = { ...GEN, sourceAlgorithmName: 'department-tree', sourceAlgorithmDisplayName: 'Department tree' };
-    const { user } = mount({ roots: [otherPlugin] });
+  it('enables member moves on the rule that produced the tree, not on the type name', async () => {
+    const otherRule = { ...GEN, sourceAlgorithmName: 'department-tree', sourceAlgorithmDisplayName: 'Department tree' };
+    const { user } = mount({ roots: [otherRule] });
     await screen.findByText('Backend Squad');
-    await user.click(screen.getAllByTitle(/Show the users directly in this context/i)[0]);
-    expect(await within(tree()).findByText('Ada Lovelace')).toBeInTheDocument();
-    expect(within(tree()).queryByTitle(/drag onto another team to move/)).not.toBeInTheDocument();
+    // An unknown rule is named by its display name under "Derived".
+    expect(within(pane()).getByRole('heading', { level: 3 })).toHaveTextContent('Derived · Department tree');
+    await user.click(within(pane()).getByRole('button', { name: 'Show the people directly in Engineering Org' }));
+    expect(await within(pane()).findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(within(pane()).queryByTitle(/drag onto another team to move/)).not.toBeInTheDocument();
   });
 
   it('renames a node in place and re-reads the tree', async () => {
     const { authFetch, user } = mount({ answer: (u, opts) => (opts.method === 'PATCH' ? { ok: true } : undefined) });
     await screen.findByText('Backend Squad');
     await user.dblClick(node('Backend Squad'));
-    const input = await screen.findByRole('textbox', { name: 'Context name' });
+    const input = await screen.findByRole('textbox', { name: 'Unit name' });
     await user.clear(input);
     await user.type(input, 'Platform Squad{Enter}');
     expect(authFetch).toHaveBeenCalledWith('/api/contexts/child-backend', expect.objectContaining({
@@ -305,13 +391,12 @@ describe('ContextsPage — editing the tree', () => {
     await waitFor(() => expect(treeCalls(authFetch).filter(u => u.endsWith('root-gen'))).toHaveLength(2));
   });
 
-  it('adds a child under a node, inheriting its target type', async () => {
+  it('adds a sub-unit under a node, inheriting its target type', async () => {
     const { authFetch, user } = mount({ answer: (u, opts) => (opts.method === 'POST' ? { id: 'new' } : undefined) });
     await screen.findByText('Backend Squad');
     const row = node('Backend Squad').closest('div');
-    await user.click(within(row).getByTitle('Add a child context'));
-    await user.type(await screen.findByRole('textbox', { name: 'New child name…' }), 'Interns{Enter}');
-    expect(authFetch).toHaveBeenCalledWith('/api/contexts', expect.objectContaining({ method: 'POST' }));
+    await user.click(within(row).getByRole('button', { name: 'Add a sub-unit' }));
+    await user.type(await screen.findByRole('textbox', { name: 'New sub-unit name…' }), 'Interns{Enter}');
     const body = JSON.parse(authFetch.mock.calls.find(([u, o]) => u === '/api/contexts' && o?.method === 'POST')[1].body);
     expect(body).toEqual({ displayName: 'Interns', targetType: 'Identity', contextType: 'ManagerHierarchy', parentContextId: 'child-backend' });
   });
@@ -320,27 +405,14 @@ describe('ContextsPage — editing the tree', () => {
     const { user } = mount({ answer: (u, opts) => (opts.method === 'PATCH' ? jsonResponse({ error: 'name taken' }, { ok: false, status: 409 }) : undefined) });
     await screen.findByText('Backend Squad');
     await user.dblClick(node('Frontend Squad'));
-    const input = await screen.findByRole('textbox', { name: 'Context name' });
+    const input = await screen.findByRole('textbox', { name: 'Unit name' });
     await user.clear(input);
     await user.type(input, 'Backend Squad{Enter}');
     expect(await screen.findByText('name taken')).toBeInTheDocument();
   });
 });
 
-describe('ContextsPage — list view, new tree, empty and error states', () => {
-  it('toggles to the list view, where a row selects the context in place', async () => {
-    const { onOpenDetail, user } = mount();
-    await screen.findByText('Backend Squad');
-    await user.click(screen.getByRole('button', { name: 'List' }));
-    expect(await screen.findByPlaceholderText('Filter by name…')).toBeInTheDocument();
-    expect(screen.getByText(/nodes$/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Frontend Squad' }));
-    await shownContext('Frontend Squad');
-    expect(onOpenDetail).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Tree' }));
-    expect(node('Frontend Squad')).toHaveAttribute('aria-current', 'true');
-  });
-
+describe('ContextsPage — new tree, empty and error states', () => {
   it('opens the New Context wizard from the pane', async () => {
     const { user } = mount();
     await screen.findByText('Sales OUs');
@@ -352,13 +424,16 @@ describe('ContextsPage — list view, new tree, empty and error states', () => {
     const authFetch = makeAuthFetch({ '/api/contexts': jsonResponse({ error: 'boom' }, { ok: false, status: 500 }) });
     renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
     expect(await screen.findByText('HTTP 500')).toBeInTheDocument();
-    expect(screen.getByText(/Select a tree on the left/i)).toBeInTheDocument();
+    expect(screen.getByText('Pick a unit on the left.')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there are no roots', async () => {
-    mount({ roots: [] });
-    expect(await screen.findByText(/Select a tree on the left/i)).toBeInTheDocument();
-    expect(screen.queryByText('Delete tree…')).not.toBeInTheDocument();
+  it('says where units come from when there are none, in plain words', async () => {
+    mount({ roots: [], select: null });
+    expect(await screen.findByText(/^No units yet\. Units come from an HR import or from a rule over the data\./)).toBeInTheDocument();
+    expect(screen.getByText('Pick a unit on the left.')).toBeInTheDocument();
+    // No kind is offered when there is none to show.
+    expect(screen.queryByRole('group', { name: 'Show' })).toBeNull();
     expect(screen.queryByTestId('context-detail-pane')).toBeNull();
+    expect(screen.queryByText(/plugin|synced|variant|from a crawler/i)).toBeNull();
   });
 });

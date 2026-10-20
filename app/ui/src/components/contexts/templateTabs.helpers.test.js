@@ -41,12 +41,14 @@ describe('templateTabs', () => {
 });
 
 describe('kindOptions', () => {
-  it('counts organisation trees per kind, ignoring other templates of the same kind', () => {
+  it('offers only the kinds that have organisation trees, ignoring other templates of the same kind', () => {
+    // The tag tree holds resources, but no organisation tree does: no Resources.
     expect(kindOptions(ROOTS)).toEqual([
-      { key: 'Identity', label: 'People 2', count: 2 },
-      { key: 'Principal', label: 'Accounts 1', count: 1 },
-      { key: 'Resource', label: 'Resources 0', count: 0 },
+      { key: 'Identity', label: 'People', count: 2 },
+      { key: 'Principal', label: 'Accounts', count: 1 },
     ]);
+    expect(kindOptions([r('a', 'OrganizationalUnit', 'Resource')]).map(o => o.key)).toEqual(['Resource']);
+    expect(kindOptions(undefined)).toEqual([]);
   });
 });
 
@@ -66,11 +68,13 @@ describe('effectiveTab / effectiveKind', () => {
     expect(effectiveTab(templateTabs([]), null)).toBe('OrganizationalUnit');
   });
 
-  it('keeps a chosen kind, else the first kind with trees, else People', () => {
-    const opts = kindOptions([r('a', 'OrganizationalUnit', 'Resource')]);
-    expect(effectiveKind(opts, 'Principal')).toBe('Principal');
-    expect(effectiveKind(opts, null)).toBe('Resource');
-    expect(effectiveKind(kindOptions([]), null)).toBe('Identity');
+  it('keeps a chosen kind while it is offered, else the first offered kind, else none', () => {
+    const opts = kindOptions([r('a', 'OrganizationalUnit', 'Resource'), r('b', 'OrganizationalUnit', 'Principal')]);
+    expect(effectiveKind(opts, 'Resource')).toBe('Resource');
+    // People has no trees: never the landing kind, even when it was chosen before.
+    expect(effectiveKind(opts, 'Identity')).toBe('Principal');
+    expect(effectiveKind(opts, null)).toBe('Principal');
+    expect(effectiveKind(kindOptions([]), null)).toBeNull();
   });
 });
 
@@ -85,7 +89,8 @@ describe('rootsForTab', () => {
     expect(rootsForTab(ROOTS, 'LogicalApplication', 'Principal').map(x => x.id)).toEqual(['app-1']);
   });
 
-  it('copes with no roots', () => {
+  it('copes with no roots, and lists nothing in Organisation without a kind', () => {
+    expect(rootsForTab(ROOTS, 'OrganizationalUnit', null)).toEqual([]);
     expect(rootsForTab(undefined, 'Tag', 'Identity')).toEqual([]);
   });
 });

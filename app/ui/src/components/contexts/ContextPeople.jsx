@@ -11,21 +11,27 @@ import ContextRoleModal from './ContextRoleModal';
 // Accountable at most, any number of Responsible. Segments and tags carry
 // none (the API refuses a role on them), so this renders nothing for them.
 //
-// Reads GET /api/contexts/:id/roles and shows both facts read-only. An analyst
-// with data.write.contexts gets a pencil beside each, opening ContextRoleModal
-// (search /api/users, PUT the chosen account with the role, DELETE one).
-// Roles a plugin or a sync wrote are shown the same way — removing one is the
-// analyst's call, the API keeps the provenance.
+// Reads GET /api/contexts/:id/roles and shows each role as a small people
+// block: the role, one line on what it means, and who holds it (initials,
+// name opening their page, e-mail on hover when the API gives one). Someone
+// with data.write.contexts gets "Set <role>" while nobody holds it and a
+// pencil once somebody does, both opening ContextRoleModal (search
+// /api/users, PUT the chosen account with the role, DELETE one).
 //
 // The template profiles pass their own vocabulary (an application's
-// Accountable is its Owner), drop the heading when they draw their own, and
-// turn on `suggest`: with no Accountable set, the Accountable fact then shows
-// the API's best guess with Confirm / Reject / Choose someone else — the last
-// opens the same Accountable modal.
+// Accountable is its Owner; `noun` is "this unit" / "this application"), drop
+// the heading when they draw their own, and turn on `suggest`: with no
+// Accountable set, the API's suggestion shows under it with Confirm / Not
+// this person / Choose someone else — the last opens the same modal.
 
 const ROLED_CATEGORIES = new Set(['OrganizationalUnit', 'LogicalApplication']);
 
-export default function ContextPeople({ attrs, onOpenDetail, heading = 'People', accountableLabel = 'Accountable', suggest = false }) {
+const ROLE_HELPERS = {
+  Accountable: (noun) => `Answers for who may access ${noun}`,
+  Responsible: () => 'Keeps the membership and access correct day to day',
+};
+
+export default function ContextPeople({ attrs, onOpenDetail, heading = 'People', accountableLabel = 'Accountable', noun = 'this unit', suggest = false }) {
   const { authFetch } = useAuth();
   const canWrite = useHasPermission('data.write.contexts');
   const enabled = ROLED_CATEGORIES.has(attrs?.contextCategory);
@@ -57,7 +63,7 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
   const remove = (roleId) => write(`/api/contexts/${attrs.id}/roles/${roleId}`, { method: 'DELETE' }, 'Remove failed');
 
   // holder = { principalId } or { identityId }: the lookup adds accounts, a
-  // best guess may name either.
+  // suggestion may name either.
   const add = (role, holder) => write(`/api/contexts/${attrs.id}/roles`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -75,33 +81,28 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
   const message = actionError || (error ? error.message : null);
   // Only once the roles have loaded: before that "no Accountable" is not known.
   const showGuess = accountable.length === 0 && suggest && !loading && !error;
+  const labelOf = (role) => (role === 'Accountable' ? accountableLabel : 'Responsible');
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700" data-testid="context-people">
-      {heading && <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{heading}</div>}
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-gray-500 dark:text-gray-400">{accountableLabel}</dt>
-        <dd className="flex flex-wrap items-center gap-1">
-          <RoleNames holders={accountable} onOpenDetail={onOpenDetail} />
-          {canWrite && <EditButton label={accountableLabel} onClick={() => open('Accountable')} />}
-          {showGuess && (
-            <ContextBestGuess contextId={attrs.id} canWrite={canWrite}
-              onConfirm={holder => add('Accountable', holder)} onChooseOther={() => open('Accountable')} />
-          )}
-        </dd>
-        <dt className="text-gray-500 dark:text-gray-400">Responsible</dt>
-        <dd className="flex flex-wrap items-center gap-1">
-          <RoleNames holders={responsible} onOpenDetail={onOpenDetail} />
-          {canWrite && <EditButton label="Responsible" onClick={() => open('Responsible')} />}
-        </dd>
-      </dl>
+    <div className="mt-3 space-y-3" data-testid="context-people">
+      {heading && <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">{heading}</div>}
+      <RoleBlock label={accountableLabel} helper={ROLE_HELPERS.Accountable(noun)} holders={accountable} loading={loading}
+        canWrite={canWrite} onSet={() => open('Accountable')} onOpenDetail={onOpenDetail}>
+        {showGuess && (
+          <ContextBestGuess contextId={attrs.id} canWrite={canWrite}
+            onConfirm={holder => add('Accountable', holder)} onChooseOther={() => open('Accountable')} />
+        )}
+      </RoleBlock>
+      <RoleBlock label="Responsible" helper={ROLE_HELPERS.Responsible(noun)} holders={responsible} loading={loading}
+        canWrite={canWrite} onSet={() => open('Responsible')} onOpenDetail={onOpenDetail} />
       {message && !editing && (
-        <div role="alert" className="mt-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-2 py-1">{message}</div>
+        <div role="alert" className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-2 py-1">{message}</div>
       )}
       {editing && (
         <ContextRoleModal
           role={editing}
-          label={editing === 'Accountable' ? accountableLabel : 'Responsible'}
+          label={labelOf(editing)}
+          helper={ROLE_HELPERS[editing](noun)}
           holders={editing === 'Accountable' ? accountable : responsible}
           onAdd={holder => add(editing, holder)}
           onRemove={remove}
@@ -113,30 +114,72 @@ export default function ContextPeople({ attrs, onOpenDetail, heading = 'People',
   );
 }
 
-// The holders of one role, read-only: each name opens the account (or the
-// person) when we can, with who added it on hover; a dash when nobody does.
-function RoleNames({ holders, onOpenDetail }) {
-  if (holders.length === 0) return <span className="text-gray-600 dark:text-gray-400">—</span>;
-  return holders.map((role, i) => {
-    const name = role.displayName || role.principalId || role.identityId;
-    const kind = role.principalId ? 'user' : 'identity';
-    const linkable = !!onOpenDetail && !!(role.principalId || role.identityId);
-    return (
-      <span key={role.id} title={`Added by ${role.addedBy}`} className="text-gray-900 dark:text-gray-200">
-        {linkable
-          ? <button type="button" onClick={() => onOpenDetail(kind, role.principalId || role.identityId, name)} className="underline decoration-dotted underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300">{name}</button>
-          : name}
-        {i < holders.length - 1 && <span aria-hidden="true">,</span>}
+// "Nobody is accountable yet." — an application's Owner reads "No owner yet."
+function emptyRoleText(label) {
+  return label === 'Owner' ? 'No owner yet.' : `Nobody is ${label.toLowerCase()} yet.`;
+}
+
+// One role: its name and meaning on the left, who holds it on the right.
+function RoleBlock({ label, helper, holders, loading, canWrite, onSet, onOpenDetail, children }) {
+  const empty = holders.length === 0;
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap items-start gap-x-4 gap-y-1">
+      <div className="w-full sm:w-48 shrink-0">
+        <div className="text-sm font-medium text-gray-900 dark:text-white">{label}</div>
+        <div className="text-xs text-gray-600 dark:text-gray-400">{helper}</div>
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {!empty && (
+          <div className="flex flex-wrap items-center gap-3">
+            {holders.map(role => <Holder key={role.id} role={role} onOpenDetail={onOpenDetail} />)}
+            {canWrite && <EditButton label={label} onClick={onSet} />}
+          </div>
+        )}
+        {empty && !loading && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-gray-600 dark:text-gray-400">{emptyRoleText(label)}</span>
+            {canWrite && (
+              <button type="button" onClick={onSet}
+                className="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50">
+                Set {label.toLowerCase()}
+              </button>
+            )}
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function initials(name) {
+  const words = String(name || '?').trim().split(/\s+/);
+  const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 2);
+  return letters.toUpperCase();
+}
+
+// One holder: initials, and the name opening the account (or the person).
+function Holder({ role, onOpenDetail }) {
+  const name = role.displayName || role.principalId || role.identityId;
+  const kind = role.principalId ? 'user' : 'identity';
+  const linkable = !!onOpenDetail && !!(role.principalId || role.identityId);
+  return (
+    <span className="inline-flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200" title={role.email || undefined}>
+      <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+        {initials(name)}
       </span>
-    );
-  });
+      {linkable
+        ? <button type="button" onClick={() => onOpenDetail(kind, role.principalId || role.identityId, name)} className="font-medium hover:underline hover:text-blue-700 dark:hover:text-blue-300">{name}</button>
+        : <span className="font-medium">{name}</span>}
+    </span>
+  );
 }
 
 function EditButton({ label, onClick }) {
   return (
     <button type="button" onClick={onClick} aria-label={`Edit ${label}`} title={`Edit ${label}`}
-      className="rounded p-0.5 text-gray-600 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-blue-300">
-      <PencilIcon className="w-3.5 h-3.5" />
+      className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-blue-300">
+      <PencilIcon className="w-4 h-4" />
     </button>
   );
 }

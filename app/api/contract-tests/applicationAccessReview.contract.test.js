@@ -21,6 +21,9 @@ const APP_NAME = 'Contract Ledger Application';
 // A second context of another type, so "several contexts" is a real run and
 // "any context of resources" is not just a logical application.
 const SECOND_NAME = 'Contract Archive Tag';
+// A unit of ACCOUNTS: the report reviews what its members hold, counted among them.
+const UNIT_NAME = 'Contract Ledger Team';
+const EMPTY_UNIT_NAME = 'Contract Empty Team';
 
 // What the customer's catalogue looks like: the fields are picked, not built in.
 const FIELDS = [
@@ -45,19 +48,21 @@ const id = {
   owner: randomUUID(),
   holderA: randomUUID(),
   holderB: randomUUID(),
+  unit: randomUUID(),
+  emptyUnit: randomUUID(),
 };
 
-async function context(contextId, contextType, displayName, attrs) {
+async function context(contextId, contextType, displayName, attrs, targetType = 'Resource') {
   await pool.query(
     `INSERT INTO "Contexts" ("id","variant","targetType","contextType","displayName","description",
                              "scopeSystemId","ownerUserId","extendedAttributes")
-     VALUES ($1,'synced','Resource',$2,$3,'Ledger of record',$4,'EMP-1',$5::jsonb)`,
-    [contextId, contextType, displayName, systemId, JSON.stringify(attrs)]);
+     VALUES ($1,'synced',$6,$2,$3,'Ledger of record',$4,'EMP-1',$5::jsonb)`,
+    [contextId, contextType, displayName, systemId, JSON.stringify(attrs), targetType]);
 }
 
-const member = (contextId, memberId) => pool.query(
+const member = (contextId, memberId, memberType = 'Resource') => pool.query(
   `INSERT INTO "ContextMembers" ("contextId","memberType","memberId","addedBy")
-   VALUES ($1,'Resource',$2,'sync')`, [contextId, memberId]);
+   VALUES ($1,$3,$2,'sync')`, [contextId, memberId, memberType]);
 
 async function seed() {
   const sys = await pool.query(
@@ -103,6 +108,15 @@ async function seed() {
   await assignment(id.ownership, id.owner, 'Direct');
   // A soft-deleted holder must not be counted.
   await assignment(id.plain, id.owner, 'Direct', { deleted: true });
+
+  // The accounts unit has ONE member, Holder A. Holder B (not a member) holds
+  // ENT_PLAIN directly and ENT_ROLED via a role: the unit's run must count A
+  // only and leave ENT_ROLED out. A also holds a business role directly, which
+  // is intent rather than an entitlement row.
+  await context(id.unit, 'Department', UNIT_NAME, {}, 'Principal');
+  await member(id.unit, id.holderA, 'Principal');
+  await assignment(id.role1, id.holderA, 'Direct');
+  await context(id.emptyUnit, 'Department', EMPTY_UNIT_NAME, {}, 'Principal');
 }
 
 const principal = (pid, displayName, email, employeeId = null) => pool.query(
@@ -139,8 +153,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool.query(`DELETE FROM "ResourceAssignments" WHERE "systemId" = $1`, [systemId]);
   await pool.query(`DELETE FROM "ResourceRelationships" WHERE "systemId" = $1`, [systemId]);
-  await pool.query(`DELETE FROM "ContextMembers" WHERE "contextId" = ANY($1::uuid[])`, [[id.app, id.app2]]);
-  await pool.query(`DELETE FROM "Contexts" WHERE "id" = ANY($1::uuid[])`, [[id.app, id.app2]]);
+  await pool.query(`DELETE FROM "ContextMembers" WHERE "contextId" = ANY($1::uuid[])`, [[id.app, id.app2, id.unit, id.emptyUnit]]);
+  await pool.query(`DELETE FROM "Contexts" WHERE "id" = ANY($1::uuid[])`, [[id.app, id.app2, id.unit, id.emptyUnit]]);
   await pool.query(`DELETE FROM "Resources" WHERE "systemId" = $1`, [systemId]);
   await pool.query(`DELETE FROM "Principals" WHERE "systemId" = $1`, [systemId]);
   await pool.query(`DELETE FROM "Systems" WHERE "id" = $1`, [systemId]);
@@ -220,7 +234,34 @@ describe('GET /reports/application-access-review/rows', () => {
   it('says so when a name matches no context, rather than returning an empty table', async () => {
     const body = await rows('No Such Application');
     expect(body.rows).toEqual([]);
-    expect(noticeText(body)).toMatch(/No context of resources matches "No Such Application"/);
+    expect(noticeText(body)).toMatch(/No context of resources or accounts matches "No Such Application"/);
+  });
+});
+
+describe('GET /reports/application-access-review/rows on a unit of accounts', () => {
+  it('pivots on what the unit\'s members hold, counted among the members, with the owner', async () => {
+    const body = await rows(UNIT_NAME);
+    // ENT_ROLED is held only by Holder B, who is not a member; the business
+    // role Holder A holds is not an entitlement row.
+    expect(body.rows.map(r => r.entitlement)).toEqual(['ENT_PLAIN']);
+    // Holder A holds it directly and via a role; Holder B's direct holding is
+    // outside the unit, so direct is 1 here where the application run says 2.
+    expect(rowFor(body, 'ENT_PLAIN')).toMatchObject({
+      directAssignments: 1, viaRoleAssignments: 1, 'entitlement.owner': 'Owner Person', 'context.name': UNIT_NAME,
+    });
+    expect(noticeText(body)).toMatch(/1 unique user\(s\) hold at least one assignment in "Contract Ledger Team"/);
+  });
+
+  it('reports a unit without members as empty', async () => {
+    const body = await rows(EMPTY_UNIT_NAME);
+    expect(body.rows).toEqual([]);
+    expect(noticeText(body)).toMatch(/"Contract Empty Team" has no members holding an entitlement/);
+  });
+
+  it('refuses to mix a unit of accounts with a context of resources', async () => {
+    const body = await rows(`${APP_NAME},${UNIT_NAME}`);
+    expect(body.rows).toEqual([]);
+    expect(noticeText(body)).toMatch(/Pick contexts of one kind/);
   });
 });
 

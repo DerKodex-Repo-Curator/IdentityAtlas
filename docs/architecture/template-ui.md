@@ -16,7 +16,7 @@ for the workflows that start from a context, with one of them built now.
 | One kind of member | Unchanged rule: a context holds one kind of member. In Organisation, a switch shows one tree at a time: **People** (identities), **Accounts** (principals), **Resources**. Nothing is merged. |
 | Unit variants | A unit that exists as several variants (people, accounts, resources — a project, a team, a customer) shows them together through `SameUnitAs`: a variant switch on the detail page ("Contoso · People 12 · Accounts 15 · Resources 31"); each variant opens its own context. |
 | Workflow cards | The page has a workflows area built from a small registry (template → cards). **One card is built: "Download report".** Room for the role interview and owner survey later; not shown until built. |
-| Report card | Runs the existing **Entitlement Pivot** (`application-access-review`, contexts of resources). Application or resource unit → on itself. People or accounts unit → on its resource variant (SameUnitAs); without one, the card says so and offers "Open in matrix" scoped to the unit. |
+| Actions | Two cards. **View in matrix** (every kind): an application or resource unit opens the matrix with its resources as columns and their holders as rows, grouped by department and folded when large; a unit of accounts or people opens it with its members as rows. **Download entitlement report** (applications, resource units, units of accounts) runs the **Entitlement Pivot** (`application-access-review`) on the context itself; for a unit of accounts the report pivots on the resources its direct members hold. A unit of people has no report card; it points to the accounts view of the unit when one exists. |
 | Readiness dots | Not now. |
 | Best guess | A suggested Accountable with its reason, and **Confirm** (sets the role) · **Reject** (remembered, never suggested again for that context) · **Choose someone else** (the existing picker). |
 | Naming | Presentation-layer rename to People / Accounts is a **separate PR** stacked on this one. This PR already uses the words in its new screens. |
@@ -24,8 +24,8 @@ for the workflows that start from a context, with one of them built now.
 ## 2. API
 
 - `GET /api/contexts/:id/roles/suggestion` → `{ role: 'Accountable', principalId | identityId, displayName, reason, count, total }` or `204` when the context already has an Accountable, carries no roles (Segment, Tag), or has no signal. Signals, first that gives a candidate:
-  - **People or accounts unit:** the manager of the most members (`Principals.managerId` / `Identities.managerIdentityId`), when they manage at least 40 % of the members. Reason: "manager of 11 of the 14 members".
-  - **Resource unit or logical application:** the account that owns the most of its resources (holders of the ControlPermission resources linked by `HasOwnership` / `HasAppOwnership`), at least 40 %. Reason: "owner of 4 of the 6 resources".
+  - **People or accounts unit:** the manager of the most members (`Principals.managerId` / `Identities.managerIdentityId`), when they manage at least 40 % of the members. Reason: "manages 11 of the 14 members".
+  - **Resource unit or logical application:** the account that owns the most of its resources (holders of the ControlPermission resources linked by `HasOwnership` / `HasAppOwnership`), at least 40 %. Reason: "owns 4 of the 6 resources".
   - A unit of one says "the only member"; a full sweep says "all 5 members".
   - A candidate rejected for this context is skipped.
 - `POST /api/contexts/:id/roles/suggestion/reject` body `{ principalId | identityId }` → 204. Stored in `ContextRoleSuggestionRejections` (migration 093: `id`, `contextId` → Contexts cascade, `principalId` | `identityId` (exactly one), `role`, `rejectedBy`, `rejectedAt`; unique per context + holder + role). Interim: moves into claims (POC step 2) when that lands.

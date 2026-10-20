@@ -1,17 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { hiddenDetailKeys, detailEntries } from './ContextDetails.helpers';
+import { hiddenDetailKeys, detailEntries, detailLabel } from './ContextDetails.helpers';
 
 const keys = (entries) => entries.map(([k]) => k);
 
+const SYNCED = {
+  id: 'c1', displayName: 'Contoso', description: 'd', variant: 'synced', targetType: 'Identity',
+  contextType: 'Department', contextCategory: 'OrganizationalUnit', scopeSystemName: 'HR', scopeSystemId: 's1',
+  parentContextId: 'p', parentDisplayName: 'Root', ownerUserId: 'u', ownerPrincipalId: 'p1', ownerDisplayName: 'Ann',
+  sourceAlgorithmName: 'x', sourceRunId: 'r', ValidFrom: '2026', externalId: 'OU=Contoso', lastSyncedAt: '2026-10-01',
+  userRenamed: false, userReparented: true, createdByUser: 'system-bootstrap',
+};
+
 describe('detailEntries — every attribute once', () => {
-  it('leaves out what the header and description show, keeps the rest in order', () => {
-    const attrs = {
-      id: 'c1', displayName: 'Contoso', description: 'd', variant: 'synced', targetType: 'Identity',
-      contextType: 'Department', contextCategory: 'OrganizationalUnit', scopeSystemName: 'HR', scopeSystemId: 's1',
-      parentContextId: 'p', parentDisplayName: 'Root', ownerUserId: 'u', ownerPrincipalId: 'p1', ownerDisplayName: 'Ann',
-      sourceAlgorithmName: 'x', sourceRunId: 'r', ValidFrom: '2026', externalId: 'OU=Contoso', lastSyncedAt: '2026-10-01',
-    };
-    expect(keys(detailEntries(attrs))).toEqual(['externalId', 'lastSyncedAt']);
+  it('a business reader gets only what the page does not say otherwise, no classification or bookkeeping', () => {
+    expect(keys(detailEntries(SYNCED))).toEqual(['externalId', 'lastSyncedAt']);
+  });
+
+  it('an analyst also gets the raw classification and the bookkeeping flags, in stored order', () => {
+    expect(keys(detailEntries(SYNCED, { analyst: true }))).toEqual([
+      'variant', 'targetType', 'contextType', 'contextCategory', 'scopeSystemName',
+      'sourceAlgorithmName', 'externalId', 'lastSyncedAt', 'userRenamed', 'userReparented', 'createdByUser',
+    ]);
   });
 
   it('drops empty values and expands extendedAttributes after the core attributes, marked as extended', () => {
@@ -36,17 +45,22 @@ describe('hiddenDetailKeys — what this page shows elsewhere', () => {
     expect(hiddenDetailKeys({ directAssignmentCount: 1 }).has('directAssignmentCount')).toBe(false);
   });
 
-  it('hides the member count the profile prints: the total when known, else the direct one', () => {
-    const both = hiddenDetailKeys({ totalMemberCount: 12, directMemberCount: 4 }, { hasProfile: true });
-    expect([both.has('totalMemberCount'), both.has('directMemberCount')]).toEqual([true, false]);
-    const direct = hiddenDetailKeys({ directMemberCount: 4 }, { hasProfile: true });
-    expect([direct.has('totalMemberCount'), direct.has('directMemberCount')]).toEqual([false, true]);
-    const none = hiddenDetailKeys({ totalMemberCount: 12, directMemberCount: 4 });
-    expect([none.has('totalMemberCount'), none.has('directMemberCount')]).toEqual([false, false]);
+  it('hides both member counts where the profile prints them', () => {
+    const profiled = hiddenDetailKeys({ totalMemberCount: 12, directMemberCount: 4 }, { hasProfile: true, analyst: true });
+    expect([profiled.has('totalMemberCount'), profiled.has('directMemberCount')]).toEqual([true, true]);
   });
 
-  it('hides the creator only where the provenance line names it (manual contexts)', () => {
-    expect(hiddenDetailKeys({ variant: 'manual' }).has('createdByUser')).toBe(true);
-    expect(hiddenDetailKeys({ variant: 'generated' }).has('createdByUser')).toBe(false);
+  it('without a profile keeps the total for everyone and the direct count for the analyst only', () => {
+    const analyst = hiddenDetailKeys({}, { analyst: true });
+    expect([analyst.has('totalMemberCount'), analyst.has('directMemberCount')]).toEqual([false, false]);
+    const reader = hiddenDetailKeys({});
+    expect([reader.has('totalMemberCount'), reader.has('directMemberCount')]).toEqual([false, true]);
+  });
+});
+
+describe('detailLabel', () => {
+  it('says "Last updated" for the calculation stamp and splits other names', () => {
+    expect(detailLabel('lastCalculatedAt')).toBe('Last updated');
+    expect(detailLabel('externalId')).toBe('External Id');
   });
 });

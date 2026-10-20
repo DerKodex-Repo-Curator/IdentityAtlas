@@ -206,12 +206,12 @@ describe('access review — contexts', () => {
     expect(query.mock.calls[0][1]).toEqual([[CTX_ID]]);
   });
 
-  it('looks contexts up by lower-cased name or id, among contexts of resources of any type', async () => {
+  it('looks contexts up by lower-cased name or id, among contexts of resources or accounts of any type', async () => {
     stage({ entitlements: [ent('a')] });
     await run({ contexts: `Ledger ENGINEERING 0006,${CTX_ID}` });
     const [sql, params] = query.mock.calls[0];
     expect(params).toEqual([['ledger engineering 0006', CTX_ID]]);
-    expect(sql).toContain(`c."targetType" = 'Resource'`);
+    expect(sql).toContain(`c."targetType" IN ('Resource', 'Principal')`);
     expect(sql).not.toContain('"contextType" =');
   });
 
@@ -225,7 +225,7 @@ describe('access review — contexts', () => {
   it('warns about a name that matches no context, and still returns the run\'s columns', async () => {
     stage({ contexts: [] });
     const result = await run({ contexts: 'Ledger Engineering 0006, Typo Ledger', fields: 'entitlement.type' });
-    expect(noticeText(result)).toMatch(/No context of resources matches "Ledger Engineering 0006", "Typo Ledger"/);
+    expect(noticeText(result)).toMatch(/No context of resources or accounts matches "Ledger Engineering 0006", "Typo Ledger"/);
     expect(result.rows).toEqual([]);
     expect(keys(result.columns)).toContain('entitlement.type');
   });

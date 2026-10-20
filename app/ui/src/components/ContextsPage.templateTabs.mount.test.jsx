@@ -52,11 +52,11 @@ const selector = () => screen.getByTestId('context-tree-pane');
 const shown = () => within(screen.getByTestId('context-detail-pane')).getByRole('heading', { level: 2 }).textContent;
 
 describe('ContextsPage — a sub-tab per template', () => {
-  it('shows the four templates and Other with their counts, opening on Organisation · People', async () => {
+  it('shows the four templates and Other without counts, opening on Organisation · People', async () => {
     mount();
     expect(await screen.findByText('Finance people / child')).toBeInTheDocument();
     // The first tab list is the template tabs (the shown context has its own below).
-    expect(within(screen.getAllByRole('tablist')[0]).getAllByRole('tab').map(t => t.textContent)).toEqual(['Organisation3', 'Applications1', 'Tags1', 'Segments1', 'Other1']);
+    expect(within(screen.getAllByRole('tablist')[0]).getAllByRole('tab').map(t => t.textContent)).toEqual(['Organisation', 'Applications', 'Tags', 'Segments', 'Other']);
     expect(tab('Organisation')).toHaveAttribute('aria-selected', 'true');
     // Only the people trees are listed; accounts and resources trees wait behind the switch.
     // The people tree's root is a node of the tree (and names the tree-actions bar).
@@ -68,16 +68,17 @@ describe('ContextsPage — a sub-tab per template', () => {
   it('switches the organisation tree kind between People, Accounts and Resources', async () => {
     const { authFetch, user } = mount();
     await screen.findByText('Finance people / child');
-    const kinds = screen.getByRole('group', { name: 'Kind of unit' });
-    expect(within(kinds).getAllByRole('button').map(b => b.textContent)).toEqual(['People 1', 'Accounts 1', 'Resources 1']);
-    expect(within(kinds).getByRole('button', { name: 'People 1' })).toHaveAttribute('aria-pressed', 'true');
+    // The switch sits in the tree panel's header, not beside the template tabs.
+    const kinds = within(selector()).getByRole('group', { name: 'Show' });
+    expect(within(kinds).getAllByRole('button').map(b => b.textContent)).toEqual(['People', 'Accounts', 'Resources']);
+    expect(within(kinds).getByRole('button', { name: 'People' })).toHaveAttribute('aria-pressed', 'true');
 
-    await user.click(within(kinds).getByRole('button', { name: 'Accounts 1' }));
+    await user.click(within(kinds).getByRole('button', { name: 'Accounts' }));
     expect(await screen.findByText('Finance accounts / child')).toBeInTheDocument();
     expect(within(selector()).queryByText('Finance people')).toBeNull();
     expect(authFetch).toHaveBeenCalledWith('/api/contexts/tree?root=ou-acc');
 
-    await user.click(within(kinds).getByRole('button', { name: 'Resources 1' }));
+    await user.click(within(kinds).getByRole('button', { name: 'Resources' }));
     expect(await screen.findByText('Finance shares / child')).toBeInTheDocument();
   });
 
@@ -88,7 +89,9 @@ describe('ContextsPage — a sub-tab per template', () => {
     await user.click(tab('Applications'));
     expect(await screen.findByText('SAP / child')).toBeInTheDocument();
     // The kind switch belongs to Organisation only.
-    expect(screen.queryByRole('group', { name: 'Kind of unit' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Show' })).toBeNull();
+    // An application always holds resources: no kind filter either.
+    expect(screen.queryByRole('combobox', { name: 'Filter by kind' })).toBeNull();
     expect(within(selector()).queryByText('Finance people')).toBeNull();
 
     await user.click(tab('Tags'));
@@ -104,13 +107,39 @@ describe('ContextsPage — a sub-tab per template', () => {
     expect(await screen.findByText('PCI / child')).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /^Other/ })).toBeNull();
     expect(tab('Tags')).toHaveAttribute('aria-selected', 'true');
-    expect(tab('Organisation')).toHaveTextContent('0');
+    expect(tab('Organisation').textContent).toBe('Organisation');
   });
 
-  it('opens on the first kind that has trees when there are no people trees', async () => {
+  it('opens on the first kind that has trees, offering no empty kind to land on', async () => {
+    mount(ROOTS.filter(r => r.id === 'ou-acc' || r.id === 'ou-res'));
+    expect(await screen.findByText('Finance accounts / child')).toBeInTheDocument();
+    const kinds = within(selector()).getByRole('group', { name: 'Show' });
+    expect(within(kinds).getAllByRole('button').map(b => b.textContent)).toEqual(['Accounts', 'Resources']);
+    expect(within(kinds).getByRole('button', { name: 'Accounts' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('with a single kind, names it rather than offering a switch', async () => {
     mount(ROOTS.filter(r => r.id === 'ou-acc'));
     expect(await screen.findByText('Finance accounts / child')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Accounts 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(selector()).queryByRole('group', { name: 'Show' })).toBeNull();
+    expect(within(selector()).getByText('Show:').parentElement).toHaveTextContent('Show:Accounts');
+  });
+
+  it('names the kind of each Tags root, so three roots called "Tags" can be told apart', async () => {
+    const tags = [
+      root('tag-ppl', 'Tags', 'Tag', 'Identity'),
+      root('tag-acc', 'Tags', 'Tag', 'Principal'),
+      root('tag-res', 'Tags', 'Tag', 'Resource'),
+    ];
+    const { user } = mount(tags);
+    await screen.findByText('Tags / child');
+    const roots = within(selector()).getAllByRole('button', { name: /^Tags · / }).map(b => b.textContent.split(',')[0]);
+    expect(roots).toEqual(['Tags · People', 'Tags · Accounts', 'Tags · Resources']);
+    // The kind filter, in words, narrows to one of them.
+    await user.selectOptions(within(selector()).getByRole('combobox', { name: 'Filter by kind' }), 'Principal');
+    expect(within(selector()).getAllByRole('button', { name: /^Tags · / }).map(b => b.textContent.split(',')[0])).toEqual(['Tags · Accounts']);
+    // Its ⋯ menu is named after the tree with its kind, not just "Tags".
+    expect(within(selector()).getByRole('button', { name: 'Actions for Tags · Accounts' })).toBeInTheDocument();
   });
 
   it('every tab has the same two panes: its tree on the left, its first root shown on the right', async () => {
@@ -144,6 +173,7 @@ describe('ContextsPage — a sub-tab per template', () => {
     const { user } = mount(ROOTS.filter(r => r.id === 'ou-ppl'));
     await screen.findByText('Finance people / child');
     await user.click(tab('Segments'));
-    await waitFor(() => expect(screen.getByText(/Select a tree on the left/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Pick a unit on the left.')).toBeInTheDocument());
+    expect(within(selector()).getByText(/^No segments yet./)).toBeInTheDocument();
   });
 });
