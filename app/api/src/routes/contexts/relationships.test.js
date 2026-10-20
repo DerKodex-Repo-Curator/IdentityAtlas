@@ -5,13 +5,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { mountRouter } from '../../../test-utils/routeTestKit.js';
 
-process.env.USE_SQL = 'true';
-
+// Same setup as roles.test.js; vi.mock is hoisted per file, so it cannot be shared.
+vi.mock('../../middleware/auth.js', () => ({ requirePermission: () => (_req, _res, next) => next() }));
 vi.mock('../../db/connection.js');   // picks up src/db/__mocks__/connection.js
 import { query, queryOne } from '../../db/connection.js';
-vi.mock('../../middleware/auth.js', () => ({
-  requirePermission: () => (_req, _res, next) => next(),
-}));
+process.env.USE_SQL = 'true';
 
 const { default: router, parseRelationshipBody } = await import('./relationships.js');
 const app = mountRouter(router);

@@ -240,17 +240,24 @@ describe('ContextsPage (mounted)', () => {
     expect(screen.getByText(/Select a tree on the left/i)).toBeInTheDocument();
   });
 
-  it('runs the Sync flow on a generated tree', async () => {
-    // POST /sync returns no runId → the poll loop is skipped, refresh runs,
-    // and the "Synced" confirmation appears.
+  // Render the page over the generated tree, with one route answered by the
+  // test and everything else falling through to the shared fixtures.
+  function renderOverGenTree(answer) {
     const authFetch = makeAuthFetch((url, opts = {}) => {
-      if (String(url).includes('/sync') && opts.method === 'POST') return { ok: true };
+      const hit = answer(String(url), opts);
+      if (hit !== undefined) return hit;
       if (String(url).includes('/api/contexts/tree')) return genSubtree;
       if (String(url).includes('/api/contexts')) return roots;
       return jsonResponse({}, { ok: false, status: 404 });
     });
     renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-    const user = userEvent.setup();
+    return { authFetch, user: userEvent.setup() };
+  }
+
+  it('runs the Sync flow on a generated tree', async () => {
+    // POST /sync returns no runId → the poll loop is skipped, refresh runs,
+    // and the "Synced" confirmation appears.
+    const { authFetch, user } = renderOverGenTree((url, opts) => (url.includes('/sync') && opts.method === 'POST' ? { ok: true } : undefined));
 
     await screen.findByText('Backend Squad');
     await user.click(screen.getByRole('button', { name: /Sync/i }));
@@ -274,14 +281,7 @@ describe('ContextsPage (mounted)', () => {
       total: 1,
       data: [{ id: 'u-1', displayName: 'Ada Lovelace', principalType: 'User' }],
     };
-    const authFetch = makeAuthFetch((url) => {
-      if (String(url).includes('/members')) return memberData;
-      if (String(url).includes('/api/contexts/tree')) return genSubtree;
-      if (String(url).includes('/api/contexts')) return roots;
-      return jsonResponse({}, { ok: false, status: 404 });
-    });
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-    const user = userEvent.setup();
+    const { authFetch, user } = renderOverGenTree((url) => (url.includes('/members') ? memberData : undefined));
 
     await screen.findByText('Backend Squad');
 
