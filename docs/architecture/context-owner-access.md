@@ -54,8 +54,9 @@ ordinary context page in its business (reading) view, read-only: no Edit, no
 role pencils, no suggestion, no member editing, members, sub-units and people
 as plain text, no Copy link or Open as page, a breadcrumb that names the direct
 parent without reading it, and a variant opening in place only when it is in
-scope. The Actions area keeps **Download entitlement report** (it runs on the
-context itself) and drops **View in matrix**, which the owner cannot open.
+scope. The Actions area drops **View in matrix**, which the owner cannot open;
+an application keeps **Download entitlement report** (it runs on the application
+itself), so an org unit shows no Actions to its owner.
 
 ## Enforcement
 

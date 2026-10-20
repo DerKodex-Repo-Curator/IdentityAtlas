@@ -32,3 +32,7 @@
 - A context tab in the app's tab strip shows its template's icon instead of the letter "C", and an analyst returns with "Back to Contexts".
 - The unit page's "Workflows" area is now **Actions**: "View in matrix" opens in a new tab (an application's resources as columns), and "Download entitlement report" gives an Excel file for applications and units of accounts.
 - The Entitlement Pivot can now run on a unit of accounts: it lists the resources the unit's members hold, counted among those members only.
+- The "Download entitlement report" card is now offered on applications only; organisational units (of people, accounts or resources) keep "View in matrix", and the "Reports are available on the accounts view" hint is gone. The Entitlement Pivot still runs on a unit of accounts from the Reports page.
+- A rule that derives several top-level units (one per department, one per risk tier) now puts them under one root named after the rule — the departments appear under "Departments" instead of six loose trees. Existing trees move under the new root on the next refresh, keeping their names, members and edits.
+- The Contexts tree names the rule that derived a tree ("Derived · Department from Principal"), and a derived unit's subtitle says which rule made it ("Department · derived by the Department from Principal rule").
+- A unit whose members cannot be loaded now says so instead of showing "No members found", and the detail pane shows "Loading…" while the trees are read instead of staying blank.

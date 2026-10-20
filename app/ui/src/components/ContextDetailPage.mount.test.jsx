@@ -202,7 +202,7 @@ describe('ContextDetailPage (mounted)', () => {
 
     // Header: the name and one sentence, no internal words.
     expect(await screen.findByText('Engineering Cluster')).toBeInTheDocument();
-    expect(screen.getByTestId('context-subtitle')).toHaveTextContent(/^Cluster · derived from the rule "K-Means Clustering"$/);
+    expect(screen.getByTestId('context-subtitle')).toHaveTextContent(/^Cluster · derived by the K-Means Clustering rule$/);
     expect(document.body.textContent).not.toMatch(/plugin|crawl|analyst|Sub-contexts|Relationships/);
     // Description card
     expect(screen.getByText('A generated cluster of engineers.')).toBeInTheDocument();

@@ -10,22 +10,6 @@ import { memberKindLabel } from '@ui/utils/contextStyles';
 // number), not only descriptions, so the label says "other fields".
 export const CONTEXT_EXTENDED_SEARCH_LABEL = 'Also search other fields';
 
-// The rule that derived a tree, in words a reader understands. A rule not
-// listed falls back to its display name.
-const RULE_WORDS = {
-  'department-from-principal': 'department field on each account',
-  'ad-ou-from-dn': 'Active Directory OU path',
-  'principal-type-tree': 'type of each account',
-  'resource-type-tree': 'type of each resource',
-  'entra-group-category-tree': 'group category',
-  'system-membership-principals': 'system each account lives in',
-  'system-membership-resources': 'system each resource lives in',
-  'orphaned-accounts': 'accounts without a person',
-  'resource-cluster': 'resources held by the same people',
-  'risky-consent': 'risky app consent',
-  'scope-hierarchy': 'scope hierarchy',
-  'context-recipe': 'search terms',
-};
 const MANAGER_HIERARCHY = 'manager-hierarchy';
 
 // Order of the source groups: imported, derived, manager hierarchy, created here.
@@ -37,13 +21,15 @@ function sourceClass(root) {
   return 'manual';
 }
 
+// The rule that derived a tree, by the name it has under Admin, so a reader
+// can tell which rule made it ("Department from Principal").
 function derivedDetail(root) {
-  return RULE_WORDS[root.sourceAlgorithmName] || root.sourceAlgorithmDisplayName || root.sourceAlgorithmName || null;
+  return root.sourceAlgorithmDisplayName || root.sourceAlgorithmName || null;
 }
 
 // The heading a root is listed under: { key, title, detail }.
 //   synced     → "Imported" · <system>
-//   generated  → "Derived" · <the rule in words>
+//   generated  → "Derived" · <the rule's display name>
 //   manager    → "Manager hierarchy" · <system>
 //   manual     → "Created here"
 export function sourceGroupOf(root) {

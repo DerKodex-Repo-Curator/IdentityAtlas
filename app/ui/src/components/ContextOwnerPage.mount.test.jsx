@@ -88,7 +88,7 @@ describe('ContextOwnerPage — one context', () => {
   it('is read-only: no Edit, no Open as page, no pencils, no member editing, no best guess', async () => {
     const { authFetch } = mount([ctx(UNIT, 'Finance', 'Responsible')]);
     await screen.findByText('Alice Member');
-    expect(screen.getByText('Rita Responsible')).toBeInTheDocument();
+    expect(await screen.findByText('Rita Responsible')).toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open as page' })).not.toBeInTheDocument();
@@ -107,19 +107,16 @@ describe('ContextOwnerPage — one context', () => {
     expect(screen.queryByRole('button', { name: /Payroll team/ })).not.toBeInTheDocument();
   });
 
-  it('keeps the Actions without the matrix: a people unit points at its accounts view for the report', async () => {
+  it('shows no Actions on an org unit: no matrix (out of reach) and no report (applications only)', async () => {
     mount([ctx(UNIT, 'Finance', 'Responsible')]);
-    const actions = await screen.findByRole('region', { name: 'Actions' });
-    expect(await within(actions).findByTestId('actions-report-hint')).toBeInTheDocument();
-    expect(screen.queryByTestId('action-view-in-matrix')).not.toBeInTheDocument();
+    await screen.findByText('Alice Member');
+    expect(screen.queryByRole('region', { name: 'Actions' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /View in matrix/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('action-download-report')).not.toBeInTheDocument();
   });
 
-  it('offers the report on an in-scope resources view, still without the matrix', async () => {
-    mount([ctx(UNIT, 'Finance', 'Responsible')]);
-    const variants = await screen.findByRole('group', { name: 'This unit as' });
-    await userEvent.click(within(variants).getByRole('button', { name: 'Resources 4' }));
+  it('offers the report on an application they own, still without the matrix', async () => {
+    mount([ctx(UNIT, 'Finance', 'Accountable')], undefined, { contextCategory: 'LogicalApplication', targetType: 'Resource' });
     const card = await screen.findByTestId('action-download-report');
     expect(within(card).getByRole('button', { name: 'Download (Excel)' })).toBeInTheDocument();
     expect(screen.queryByTestId('action-view-in-matrix')).not.toBeInTheDocument();

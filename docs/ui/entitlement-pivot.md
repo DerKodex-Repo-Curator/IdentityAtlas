@@ -32,8 +32,8 @@ in sub-units are not included; add the sub-units to the run to review them as we
 units of accounts with contexts of resources, because the counts would mean different things; the
 report says so instead.
 
-The quickest way in is the unit's own page: **Actions › Download entitlement report** downloads the
-Excel file for that unit. A unit of people has no report yet; open the accounts view of the same unit.
+Run it on a unit from the **Reports** page (pick the unit under contexts). The **Actions › Download
+entitlement report** card is on application pages only; a unit's page offers **View in matrix**.
 
 ## Choosing the columns
 

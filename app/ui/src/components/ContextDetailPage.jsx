@@ -102,6 +102,7 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
         members={m.members}
         memberTotal={m.memberTotal}
         membersLoading={m.membersLoading}
+        membersError={m.membersError}
         memberPage={m.memberPage}
         onMemberPageChange={m.setMemberPage}
         pageSize={MEMBER_PAGE_SIZE}
