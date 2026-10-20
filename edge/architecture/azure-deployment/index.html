@@ -16,7 +16,7 @@
         <link rel="prev" href="../azure-deployment-walkthrough/">
       
       
-        <link rel="next" href="../desktop-portable/">
+        <link rel="next" href="../azure-gitops/">
       
       
         
@@ -2106,6 +2106,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../azure-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure as Code (GitOps)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -5914,7 +5942,9 @@ with, without anyone filling in a version, so template and images cannot drift
 apart. It is the copy to keep in your own repository when you manage the
 deployment as code: an upgrade then brings the template changes and the new
 images in together. (The Deploy to Azure button keeps reading <code>main</code>'s
-template, which is not pinned and follows <code>imageChannel</code>.)</p>
+template, which is not pinned and follows <code>imageChannel</code>.) For the full setup,
+an update workflow that proposes each new release as a pull request plus a
+deploy pipeline, see <a href="../azure-gitops/">Managing the Azure deployment as code</a>.</p>
 <p>With the version pinned:</p>
 <ul>
 <li><strong>Every deployment is reproducible.</strong> The same template and parameters run the
