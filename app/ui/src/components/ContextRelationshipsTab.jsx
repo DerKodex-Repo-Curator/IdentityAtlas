@@ -144,17 +144,49 @@ function MembersPanel({
 }
 
 // ─── Members table ─────────────────────────────────────────────────────────
+const muted = (value) => <span className="text-gray-600 dark:text-gray-400">{value || '-'}</span>;
+const pill = (value) => value && (
+  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded px-1.5 py-0.5">{value}</span>
+);
+const status = (enabled) => enabled != null && (
+  <span className={`text-xs rounded px-1.5 py-0.5 ${enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700 dark:text-red-400'}`}>
+    {enabled ? 'Active' : 'Disabled'}
+  </span>
+);
+
+// The columns after Name, per kind of member — what the API returns for it
+// (MEMBER_COLUMNS in routes/contexts/read.js).
+const MEMBER_TABLE_COLUMNS = {
+  Principal: [
+    { label: 'Email', render: m => muted(m.email) },
+    { label: 'Job Title', render: m => muted(m.jobTitle) },
+    { label: 'Type', render: m => pill(m.principalType) },
+    { label: 'Status', render: m => status(m.accountEnabled) },
+  ],
+  Identity: [
+    { label: 'Email', render: m => muted(m.email) },
+    { label: 'Job Title', render: m => muted(m.jobTitle) },
+    { label: 'Department', render: m => muted(m.department) },
+  ],
+  Resource: [
+    { label: 'Type', render: m => pill(m.resourceType) },
+    { label: 'Description', render: m => muted(m.description) },
+    { label: 'Status', render: m => status(m.enabled) },
+  ],
+  System: [
+    { label: 'Description', render: m => muted(m.description) },
+  ],
+};
+
 function MembersTable({ members, canEditMembers, isGenerated, includeDescendants, targetType, onOpenDetail, onRemove }) {
+  const columns = MEMBER_TABLE_COLUMNS[targetType] || [];
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
             <th className="pb-2 font-medium">Name</th>
-            <th className="pb-2 font-medium">Email</th>
-            <th className="pb-2 font-medium">Job Title</th>
-            <th className="pb-2 font-medium">Type</th>
-            <th className="pb-2 font-medium">Status</th>
+            {columns.map(c => <th key={c.label} className="pb-2 font-medium">{c.label}</th>)}
             {canEditMembers && <th className="pb-2 font-medium"></th>}
           </tr>
         </thead>
@@ -166,20 +198,7 @@ function MembersTable({ members, canEditMembers, isGenerated, includeDescendants
               onClick={() => onOpenDetail(memberDetailKind(targetType), m.id, m.displayName)}
             >
               <td className="py-1.5 text-blue-600 dark:text-blue-400 hover:underline">{m.displayName}</td>
-              <td className="py-1.5 text-gray-600 dark:text-gray-400">{m.email || '-'}</td>
-              <td className="py-1.5 text-gray-600 dark:text-gray-400">{m.jobTitle || '-'}</td>
-              <td className="py-1.5">
-                {m.principalType && (
-                  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded px-1.5 py-0.5">{m.principalType}</span>
-                )}
-              </td>
-              <td className="py-1.5">
-                {m.accountEnabled != null && (
-                  <span className={`text-xs rounded px-1.5 py-0.5 ${m.accountEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700 dark:text-red-400'}`}>
-                    {m.accountEnabled ? 'Active' : 'Disabled'}
-                  </span>
-                )}
-              </td>
+              {columns.map(c => <td key={c.label} className="py-1.5">{c.render(m)}</td>)}
               {canEditMembers && (
                 <td className="py-1.5 text-right">
                   {includeDescendants ? (
