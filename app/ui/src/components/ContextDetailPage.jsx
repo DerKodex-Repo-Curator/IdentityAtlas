@@ -4,16 +4,20 @@ import RiskScoreSection from './RiskScoreSection';
 import ContextDetailHeader from './ContextDetailHeader';
 import ContextProfile from './contexts/profiles/ContextProfile';
 import { profileFor } from './contexts/profiles/profiles';
-import ContextAttributesTab from './ContextAttributesTab';
+import ContextDetails from './contexts/ContextDetails';
+import ContextEditModal from './contexts/ContextEditModal';
 import ContextRelationshipsTab from './ContextRelationshipsTab';
 import TabBar from './TabBar';
 import EntityTimeline from './EntityTimeline';
 import useTimeline from '@ui/hooks/useTimeline';
 import useFeatures from '@ui/hooks/useFeatures';
+import { useHasPermission } from '@ui/auth/usePermissions';
 
 // ─── Context Detail Page ──────────────────────────────────────────────────────
 // Shows details for a single Context (v6 shape): header with variant /
-// target / scope-system / owner, paginated members, sub-contexts.
+// target / scope-system / owner, the profile facts and the remaining
+// attributes (More details), then tabs: paginated members + sub-contexts,
+// timeline, risk. Edits open in a modal from the header's Edit button.
 // Loaded via /api/contexts/:id.
 //
 // `embedded`: rendered inside the Contexts page's right pane — no close
@@ -24,6 +28,8 @@ import useFeatures from '@ui/hooks/useFeatures';
 export default function ContextDetailPage({ contextId, onCacheData, onClose, onOpenDetail, embedded = false, onOpenAsPage, refreshKey, onEdited }) {
   const { authFetch } = useAuth();
   const features = useFeatures();
+  const canWrite = useHasPermission('data.write.contexts');
+  const [editing, setEditing] = useState(false);
   // loading/error are flipped synchronously inside the fetch effects; reducer
   // dispatches keep that clear of set-state-in-effect.
   const [loading, setLoading] = useReducer((_, v) => v, true);
@@ -128,18 +134,6 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
 
   // One render function per tab; only the active one runs.
   const panels = {
-    attributes: () => (
-      <ContextAttributesTab
-        contextId={contextId}
-        attrs={detail.attributes}
-        isManual={isManual}
-        isGenerated={isGenerated}
-        authFetch={authFetch}
-        onUpdated={() => { fetchDetail(); onEdited?.(); }}
-        onDeleted={() => onClose?.()}
-      />
-    ),
-
     relationships: () => (
       <ContextRelationshipsTab
         subContexts={subContexts}
@@ -185,7 +179,18 @@ export default function ContextDetailPage({ contextId, onCacheData, onClose, onO
         onClose={close}
         onOpenAsPage={embedded ? () => onOpenAsPage?.(detail.attributes) : undefined}
         onOpenDetail={onOpenDetail}
+        onEdit={canWrite && canEditMembers ? () => setEditing(true) : undefined}
       />
+
+      {editing && (
+        <ContextEditModal
+          contextId={contextId}
+          attrs={detail.attributes}
+          onUpdated={() => { setEditing(false); fetchDetail(); onEdited?.(); }}
+          onDeleted={() => { setEditing(false); onClose?.(); }}
+          onClose={() => setEditing(false)}
+        />
+      )}
 
       <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
@@ -229,7 +234,6 @@ function DetailStatus({ loading, error, onRetry, onClose }) {
 // The tabs under the profile; Risk only when risk scoring has a score for it.
 function detailTabs(hasRisk, memberTotal) {
   return [
-    { key: 'attributes', label: 'Attributes' },
     { key: 'relationships', label: 'Relationships', count: memberTotal },
     { key: 'timeline', label: 'Timeline' },
     hasRisk && { key: 'risk', label: 'Risk' },
@@ -237,19 +241,20 @@ function detailTabs(hasRisk, memberTotal) {
 }
 
 // Header, description and — for organisational units and applications — the
-// template's profile (facts, variants, workflows). Tags, segments and the
-// rest keep the generic page.
-function DetailTop({ contextId, attrs, subContexts, onClose, onOpenAsPage, onOpenDetail }) {
+// template's profile (facts, variants, workflows), with the remaining
+// attributes (More details) at the foot of its facts. Tags, segments and the
+// rest keep the generic page, with More details as a card of its own.
+function DetailTop({ contextId, attrs, subContexts, onClose, onOpenAsPage, onOpenDetail, onEdit }) {
   const profile = profileFor(attrs.contextCategory);
   return (
     <>
-      <ContextDetailHeader attrs={attrs} onClose={onClose} onOpenAsPage={onOpenAsPage} onOpenDetail={onOpenDetail} />
+      <ContextDetailHeader attrs={attrs} onClose={onClose} onOpenAsPage={onOpenAsPage} onOpenDetail={onOpenDetail} onEdit={onEdit} />
       {attrs.description && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{attrs.description}</div>
       )}
-      {profile && (
-        <ContextProfile key={contextId} profile={profile} attrs={attrs} subContexts={subContexts} onOpenDetail={onOpenDetail} />
-      )}
+      {profile
+        ? <ContextProfile key={contextId} profile={profile} attrs={attrs} subContexts={subContexts} onOpenDetail={onOpenDetail} />
+        : <ContextDetails key={contextId} attrs={attrs} framed />}
     </>
   );
 }

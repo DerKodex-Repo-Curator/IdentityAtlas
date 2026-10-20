@@ -97,17 +97,34 @@ describe('ContextProfile — organisational unit', () => {
   });
 });
 
+describe('ContextProfile — the remaining attributes, once', () => {
+  it('lists what the facts do not show under More details, and not the member count they do', async () => {
+    mount({ attrs: { ...PEOPLE, externalId: 'OU=Contoso', lastSyncedAt: '2026-10-01T08:00:00Z', extendedAttributes: { costCenter: 'CC-12' } } });
+    const details = await screen.findByRole('region', { name: 'More details' });
+    // It sits inside the facts card, after the facts.
+    expect(facts('About this unit')).toContainElement(details);
+    expect(within(details).getByText('External Id').nextElementSibling).toHaveTextContent('OU=Contoso');
+    expect(within(details).getByText('Last Synced At')).toBeInTheDocument();
+    expect(within(details).getByText('costCenter').nextElementSibling).toHaveTextContent('CC-12');
+    // The facts show the total (12); the direct count is still only here.
+    expect(within(details).queryByText('Total Member Count')).toBeNull();
+    expect(within(details).getByText('Direct Member Count').nextElementSibling).toHaveTextContent(/^4$/);
+    expect(within(details).queryByText('Display Name')).toBeNull();
+  });
+});
+
 describe('ContextProfile — logical application', () => {
   const APP = { id: 'c-app', displayName: 'SAP', contextCategory: 'LogicalApplication', targetType: 'Resource', totalMemberCount: 31 };
 
   it('calls the Accountable its Owner and counts its resources', async () => {
-    mount({ profile: PROFILES.LogicalApplication, attrs: APP, links: [], roles: [{ id: 'r', role: 'Accountable', principalId: 'p-1', displayName: 'Ann Owner', addedBy: 'analyst' }] });
+    const { user } = mount({ profile: PROFILES.LogicalApplication, attrs: APP, links: [], roles: [{ id: 'r', role: 'Accountable', principalId: 'p-1', displayName: 'Ann Owner', addedBy: 'analyst' }] });
     const region = facts('About this application');
     expect(await within(region).findByText('Ann Owner')).toBeInTheDocument();
     expect(within(region).getByText('Owner', { selector: 'dt' })).toBeInTheDocument();
-    // The picker uses the same word.
-    expect(within(region).getByRole('option', { name: 'Owner' })).toHaveValue('Accountable');
-    expect(within(region).queryByText('Accountable')).toBeNull();
+    // The pencil and its modal use the same word.
+    await user.click(within(region).getByRole('button', { name: 'Edit Owner' }));
+    expect(screen.getByRole('heading', { name: 'Set Owner' })).toBeInTheDocument();
+    expect(within(region).queryByText(/Accountable/)).toBeNull();
     expect(fact(region, 'Resources')).toHaveTextContent(/^31$/);
     expect(within(region).queryByText('Sub-units')).toBeNull();
   });

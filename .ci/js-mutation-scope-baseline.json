@@ -185,7 +185,6 @@
     "app/ui/src/components/AdminPage.jsx",
     "app/ui/src/components/AuthSettingsPage.jsx",
     "app/ui/src/components/ConfidenceBar.jsx",
-    "app/ui/src/components/ContextAttributesTab.jsx",
     "app/ui/src/components/ContextDetailHeader.jsx",
     "app/ui/src/components/ContextDetailPage.jsx",
     "app/ui/src/components/ContextRelationshipsTab.jsx",

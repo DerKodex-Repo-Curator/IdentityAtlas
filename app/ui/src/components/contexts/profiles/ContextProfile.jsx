@@ -1,13 +1,15 @@
 import { memberKindLabel } from '@ui/utils/contextStyles';
 import ContextPeople from '@ui/components/contexts/ContextPeople';
 import WorkflowsArea from '@ui/components/contexts/workflows/WorkflowsArea';
+import ContextDetails from '@ui/components/contexts/ContextDetails';
 import UnitVariants from './UnitVariants';
 import { useUnitVariants } from './useUnitVariants';
 import { memberCount } from './variants.helpers';
 
 // The facts a templated context shows first — who answers for it (with a best
 // guess while no Accountable is set), what it holds, its sub-units, its
-// variants — and below them the workflows that start from it. `profile` is an
+// variants — then every other attribute once (More details), and below them
+// the workflows that start from it. `profile` is an
 // entry of profiles.js; it supplies the vocabulary.
 export default function ContextProfile({ profile, attrs, subContexts = [], onOpenDetail }) {
   const { variants, loading } = useUnitVariants(attrs);
@@ -30,6 +32,7 @@ export default function ContextProfile({ profile, attrs, subContexts = [], onOpe
           )}
         </dl>
         <UnitVariants attrs={attrs} variants={variants} loading={loading} onOpenDetail={onOpenDetail} showWhenAlone={profile.variantsAlways} />
+        <ContextDetails attrs={attrs} hasProfile />
       </section>
       <WorkflowsArea attrs={attrs} variants={variants} variantsLoading={loading} onOpenDetail={onOpenDetail} />
     </>

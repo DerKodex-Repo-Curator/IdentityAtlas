@@ -5,3 +5,5 @@
 - Contexts now shows the tab's trees as one tree on the left and the selected context on the right; selecting a unit, application, tag or segment no longer opens a new tab, and "Open as page" still does.
 - Variant and sub-context links on a context select it in place, switching between People, Accounts and Resources where needed, and each tab remembers what you last selected.
 - The suggested owner's reason reads naturally for small units ("manager of the only member", "all 5 members").
+- The context page no longer has an Attributes tab: every attribute now appears once at the top, with the less-used ones under a collapsible "More details", and editing a context moved to an Edit button in the header.
+- Accountable and Responsible are shown read-only with a small edit button that opens a pop-up to look people up, add, remove or clear them; the best guess's "Choose someone else" opens the same pop-up.

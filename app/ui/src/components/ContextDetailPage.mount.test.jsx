@@ -10,6 +10,7 @@ import {
   fireEvent,
   waitFor,
   userEvent,
+  within,
 } from '@ui/test-utils/renderWithProviders';
 
 // useFeatures uses the global `fetch` (not authFetch) to hit /api/features.
@@ -216,19 +217,92 @@ describe('ContextDetailPage (mounted)', () => {
     expect(screen.getByText('Disabled')).toBeInTheDocument();
   });
 
-  it('switches to the Attributes tab and shows cleaned attributes + generated actions', async () => {
+  it('has no Attributes tab and shows each remaining attribute once, under More details', async () => {
     renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch: routes() } });
-    const user = userEvent.setup();
-
     await screen.findByText('Engineering Cluster');
-    await user.click(screen.getByRole('tab', { name: /Attributes/i }));
+    expect(screen.queryByRole('tab', { name: /Attributes/i })).toBeNull();
+    expect(screen.getAllByRole('tab').map(t => t.textContent.replace(/\d+$/, ''))).toEqual(['Relationships', 'Timeline', 'Risk']);
 
-    // Attributes grid shows non-system attrs only.
-    expect(await screen.findByText('department')).toBeInTheDocument();
-    expect(screen.getByText('Engineering')).toBeInTheDocument();
-    expect(screen.getByText('confidence')).toBeInTheDocument();
-    // Generated-context actions block.
+    const details = screen.getByRole('region', { name: 'More details' });
+    expect(within(details).getByText('Department').nextElementSibling).toHaveTextContent('Engineering');
+    expect(within(details).getByText('Confidence').nextElementSibling).toHaveTextContent('0.92');
+    // A context without a profile has no member fact, so both counts are here.
+    expect(within(details).getByText('Total Member Count').nextElementSibling).toHaveTextContent('5');
+    // What the header or the description card already shows is not repeated.
+    for (const shown of ['EntraID', 'A generated cluster of engineers.', 'Engineering']) {
+      expect(screen.getAllByText(shown)).toHaveLength(1);
+    }
+    for (const key of ['Display Name', 'Variant', 'Scope System Name', 'Source Algorithm Name', 'Description']) {
+      expect(within(details).queryByText(key)).toBeNull();
+    }
+  });
+
+  it('folds a long details list until it is opened', async () => {
+    const many = Object.fromEntries(Array.from({ length: 8 }, (_, i) => ['field' + i, 'v' + i]));
+    const authFetch = routes({ '/api/contexts/ctx-1': { ...generatedDetail, attributes: { ...generatedDetail.attributes, ...many } } });
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+    const toggle = await screen.findByRole('button', { name: /More details/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Field0')).toBeNull();
+    await userEvent.setup().click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Field0').nextElementSibling).toHaveTextContent('v0');
+  });
+
+  it('Edit opens the editor in a modal, with the plugin delete; a save refreshes the page', async () => {
+    const authFetch = routes();
+    const onEdited = vi.fn();
+    renderWithProviders(h(ContextDetailPage, { ...baseProps, onEdited }), { auth: { authFetch } });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    expect(screen.getByRole('heading', { name: 'Edit Engineering Cluster' })).toBeInTheDocument();
     expect(screen.getByText('Generated context — actions')).toBeInTheDocument();
+
+    const name = screen.getByLabelText('Display name');
+    await user.clear(name);
+    await user.type(name, 'Platform Cluster');
+    const detailReads = () => authFetch.mock.calls.filter(([u, o]) => u === '/api/contexts/ctx-1' && !o?.method).length;
+    const before = detailReads();
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts/ctx-1', expect.objectContaining({ method: 'PATCH' }));
+    await waitFor(() => expect(detailReads()).toBe(before + 1));
+    expect(onEdited).toHaveBeenCalled();
+    await screen.findByText('Engineering Cluster');
+    expect(screen.queryByRole('heading', { name: 'Edit Engineering Cluster' })).toBeNull();
+  });
+
+  it('the generated delete in the Edit modal deletes and closes the page', async () => {
+    const authFetch = routes();
+    const onClose = vi.fn();
+    renderWithProviders(h(ContextDetailPage, { ...baseProps, onClose }), { auth: { authFetch } });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const actions = screen.getByText('Generated context — actions').closest('div.rounded-lg');
+    await user.click(within(actions).getByRole('button', { name: 'Delete context…' }));
+    await user.click(within(actions).getByRole('button', { name: 'Yes, delete' }));
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts/ctx-1', expect.objectContaining({ method: 'DELETE' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('the modal close button leaves the context untouched', async () => {
+    const authFetch = routes();
+    renderWithProviders(h(ContextDetailPage, { ...baseProps, embedded: true }), { auth: { authFetch } });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('heading', { name: 'Edit Engineering Cluster' })).toBeNull();
+    expect(authFetch).not.toHaveBeenCalledWith('/api/contexts/ctx-1', expect.objectContaining({ method: 'PATCH' }));
+  });
+
+  it('offers no Edit for a synced context, nor to a reader', async () => {
+    const synced = routes({ '/api/contexts/ctx-1': { ...generatedDetail, attributes: { ...generatedDetail.attributes, variant: 'synced' } } });
+    const { unmount } = renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch: synced } });
+    await screen.findByText('Engineering Cluster');
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    unmount();
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch: routes(), hasWildcard: false, permissions: new Set(['data.read']) } });
+    await screen.findByText('Engineering Cluster');
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
   });
 
   it('switches to the Timeline tab and triggers the timeline fetch', async () => {

@@ -9,7 +9,7 @@ import { useFetch } from '@ui/hooks/useFetch';
 // the owner of most resources of an application. The analyst can:
 //   Confirm             — sets the role (the caller PUTs it and refreshes)
 //   Reject              — remembered by the API, never suggested again here
-//   Choose someone else — hands over to the existing person picker
+//   Choose someone else — opens the Accountable modal (ContextRoleModal)
 // A reader sees the guess and its reason, without the buttons.
 
 // 204 has no body; turn it into "no suggestion" so useFetch can parse it.

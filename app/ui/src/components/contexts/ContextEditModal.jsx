@@ -1,79 +1,29 @@
 import { useState } from 'react';
-import ManualContextEditor from './contexts/ManualContextEditor';
+import { useAuth } from '@ui/auth/AuthGate';
+import { Modal } from './ModalPrimitives';
+import ManualContextEditor from './ManualContextEditor';
 
-// ─── Attributes tab ───────────────────────────────────────────────────────────
-// Inline editor (manual + generated contexts), generated-context delete actions,
-// and the cleaned attribute grid.
+// ─── Edit a context ───────────────────────────────────────────────────────
+// Opened by the header's Edit button (it used to live in the Attributes tab).
+// Manual and generated (plugin) contexts are editable — name, description,
+// owner, template, parent, add a child, delete; synced contexts are not (the
+// next crawl would overwrite the edit), and the header offers no Edit for
+// them. A generated context also gets the plugin-aware delete below.
+//
+// onUpdated runs after a save or an added child, onDeleted after a delete;
+// the page closes the modal on either.
 
-const SYSTEM_COLS = new Set([
-  'SysStartTime', 'SysEndTime', 'ValidFrom', 'ValidTo',
-  // New-shape fields already surfaced in the header — don't repeat in the
-  // attributes grid.
-  'id', 'variant', 'targetType', 'contextType', 'contextCategory', 'displayName', 'description',
-  'parentContextId', 'scopeSystemId', 'scopeSystemName', 'sourceAlgorithmId',
-  'sourceAlgorithmName', 'sourceAlgorithmDisplayName', 'sourceRunId',
-  'createdByUser', 'ownerUserId', 'externalId', 'parentDisplayName',
-  // The owner resolved to a principal by the read endpoint — shown as a person
-  // in the header, so repeating the raw ids down here is noise.
-  'ownerPrincipalId', 'ownerDisplayName',
-]);
-
-function cleanAttributes(attrs) {
-  if (!attrs) return {};
-  const clean = {};
-  for (const [key, value] of Object.entries(attrs)) {
-    if (!SYSTEM_COLS.has(key) && value != null && value !== '') {
-      clean[key] = value;
-    }
-  }
-  return clean;
-}
-
-export default function ContextAttributesTab({ contextId, attrs, isManual, isGenerated, authFetch, onUpdated, onDeleted }) {
-  const cleaned = cleanAttributes(attrs);
-  const hasAttrs = Object.keys(cleaned).length > 0;
-
+export default function ContextEditModal({ contextId, attrs, onUpdated, onDeleted, onClose }) {
+  const { authFetch } = useAuth();
   return (
-    <>
-      {/* Inline editor — manual and generated (plugin) contexts are editable;
-          synced contexts are read-only. */}
-      {(isManual || isGenerated) && (
-        <ManualContextEditor
-          contextId={contextId}
-          attrs={attrs}
-          onUpdated={onUpdated}
-          onDeleted={onDeleted}
-        />
-      )}
-
-      {/* Generated-context actions — delete only; everything else is owned
-          by the plugin that produced this row. */}
-      {isGenerated && (
-        <GeneratedContextActions
-          contextId={contextId}
-          attrs={attrs}
-          authFetch={authFetch}
-          onDeleted={onDeleted}
-        />
-      )}
-
-      {hasAttrs && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Attributes</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
-            {Object.entries(cleaned).map(([key, value]) => (
-              <div key={key} className="flex items-baseline gap-2 py-1">
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium min-w-[140px]">{key}</span>
-                <span className="text-sm text-gray-900 dark:text-white break-all">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {!hasAttrs && !isManual && !isGenerated && (
-        <div className="bg-white dark:bg-gray-800 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center text-sm text-gray-600 dark:text-gray-500">No additional attributes.</div>
-      )}
-    </>
+    <Modal title={`Edit ${attrs.displayName || 'context'}`} onClose={onClose} width={720} dismissOnBackdrop={false}>
+      <div className="space-y-4">
+        <ManualContextEditor contextId={contextId} attrs={attrs} onUpdated={onUpdated} onDeleted={onDeleted} />
+        {attrs.variant === 'generated' && (
+          <GeneratedContextActions contextId={contextId} attrs={attrs} authFetch={authFetch} onDeleted={onDeleted} />
+        )}
+      </div>
+    </Modal>
   );
 }
 
