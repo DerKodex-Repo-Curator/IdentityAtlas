@@ -2,3 +2,6 @@
 - Organisational units and applications open with their key facts: who is accountable (the owner, for an application) and responsible, members, sub-units, and the unit's variants ("Contoso · People 12 · Accounts 15 · Resources 31"), each opening its own context
 - When nobody is accountable, the page suggests someone and says why — the manager of most of the unit's people or accounts, or the owner of most of its resources — with Confirm, Reject (never suggested again for that unit) and Choose someone else
 - A unit or application can download its Entitlement Pivot report straight from its page; a people or accounts unit uses its resources variant, or offers the matrix scoped to the unit when it has none
+- Contexts now shows the tab's trees as one tree on the left and the selected context on the right; selecting a unit, application, tag or segment no longer opens a new tab, and "Open as page" still does.
+- Variant and sub-context links on a context select it in place, switching between People, Accounts and Resources where needed, and each tab remembers what you last selected.
+- The suggested owner's reason reads naturally for small units ("manager of the only member", "all 5 members").

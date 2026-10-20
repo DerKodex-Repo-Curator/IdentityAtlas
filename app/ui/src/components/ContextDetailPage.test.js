@@ -15,7 +15,7 @@ describe('ContextDetailPage', () => {
 
   it('renders a distinct error UI with a retry that re-runs the fetch', () => {
     expect(src).toContain('Failed to load context');
-    expect(src).toContain('onClick={fetchDetail}');
+    expect(src).toContain('onRetry={fetchDetail}');
   });
 
   it('handles the not-found / empty case', () => {

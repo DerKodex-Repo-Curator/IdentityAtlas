@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createElement as h } from 'react';
 import ContextsPage from './ContextsPage';
 import { renderWithProviders, makeAuthFetch, screen, within, waitFor, userEvent } from '@ui/test-utils/renderWithProviders';
+
+beforeEach(() => { sessionStorage.clear(); });
 
 // One root per place it can land: three organisation trees (one of each kind),
 // an application, a tag, a segment, and one without a template.
@@ -20,7 +22,8 @@ const ROOTS = [
 ];
 
 // The subtree of whichever root is asked for: the root with one child named
-// after it, so the right pane shows which tree is open.
+// after it, so the left tree shows which tree is open; and each root's detail
+// for the right pane.
 function api(roots = ROOTS) {
   return makeAuthFetch((url) => {
     const u = String(url);
@@ -30,6 +33,9 @@ function api(roots = ROOTS) {
       return [{ ...r, children: [{ ...r, id: `${r.id}-child`, displayName: `${r.displayName} / child`, children: [] }] }];
     }
     if (u === '/api/contexts') return { data: roots };
+    const d = /^\/api\/contexts\/([^/?]+)$/.exec(u);
+    const hit = d && roots.find(x => x.id === decodeURIComponent(d[1]));
+    if (hit) return { attributes: hit, subContexts: [] };
     return undefined;
   });
 }
@@ -41,16 +47,20 @@ function mount(roots) {
 }
 
 const tab = (name) => screen.getByRole('tab', { name: new RegExp(`^${name}`) });
-const selector = () => screen.getByText('Trees').closest('div.flex-col');
+const selector = () => screen.getByTestId('context-tree-pane');
+// The context the right pane shows: its header's heading.
+const shown = () => within(screen.getByTestId('context-detail-pane')).getByRole('heading', { level: 2 }).textContent;
 
 describe('ContextsPage — a sub-tab per template', () => {
   it('shows the four templates and Other with their counts, opening on Organisation · People', async () => {
     mount();
     expect(await screen.findByText('Finance people / child')).toBeInTheDocument();
-    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Organisation3', 'Applications1', 'Tags1', 'Segments1', 'Other1']);
+    // The first tab list is the template tabs (the shown context has its own below).
+    expect(within(screen.getAllByRole('tablist')[0]).getAllByRole('tab').map(t => t.textContent)).toEqual(['Organisation3', 'Applications1', 'Tags1', 'Segments1', 'Other1']);
     expect(tab('Organisation')).toHaveAttribute('aria-selected', 'true');
     // Only the people trees are listed; accounts and resources trees wait behind the switch.
-    expect(within(selector()).getByText('Finance people')).toBeInTheDocument();
+    // The people tree's root is a node of the tree (and names the tree-actions bar).
+    expect(within(selector()).getByRole('button', { name: /^Finance people(?! \/)/ })).toHaveAttribute('aria-current', 'true');
     expect(within(selector()).queryByText('Finance accounts')).toBeNull();
     expect(within(selector()).queryByText('SAP')).toBeNull();
   });
@@ -101,6 +111,33 @@ describe('ContextsPage — a sub-tab per template', () => {
     mount(ROOTS.filter(r => r.id === 'ou-acc'));
     expect(await screen.findByText('Finance accounts / child')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Accounts 1' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('every tab has the same two panes: its tree on the left, its first root shown on the right', async () => {
+    const { user } = mount();
+    await waitFor(() => expect(shown()).toBe('Finance people'));
+    for (const [name, root] of [['Applications', 'SAP'], ['Tags', 'PCI'], ['Segments', 'Amsterdam'], ['Other', 'Legacy cluster']]) {
+      await user.click(tab(name));
+      await waitFor(() => expect(shown()).toBe(root));
+      expect(await within(selector()).findByText(`${root} / child`)).toBeInTheDocument();
+    }
+  });
+
+  it('selects a node in place on a non-Organisation tab and remembers it per tab', async () => {
+    const onOpenDetail = vi.fn();
+    renderWithProviders(h(ContextsPage, { onOpenDetail }), { auth: { authFetch: api() } });
+    const user = userEvent.setup();
+    await screen.findByText('Finance people / child');
+    await user.click(tab('Applications'));
+    const childChip = (await within(selector()).findByText('SAP / child')).closest('button');
+    await user.click(childChip);
+    await waitFor(() => expect(childChip).toHaveAttribute('aria-current', 'true'));
+    expect(onOpenDetail).not.toHaveBeenCalled();
+    // Away and back: the application tab kept its selection.
+    await user.click(tab('Tags'));
+    await waitFor(() => expect(shown()).toBe('PCI'));
+    await user.click(tab('Applications'));
+    await waitFor(() => expect(within(selector()).getByText('SAP / child').closest('button')).toHaveAttribute('aria-current', 'true'));
   });
 
   it('shows the empty prompt on a tab without trees', async () => {

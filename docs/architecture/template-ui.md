@@ -25,7 +25,8 @@ for the workflows that start from a context, with one of them built now.
 
 - `GET /api/contexts/:id/roles/suggestion` → `{ role: 'Accountable', principalId | identityId, displayName, reason, count, total }` or `204` when the context already has an Accountable, carries no roles (Segment, Tag), or has no signal. Signals, first that gives a candidate:
   - **People or accounts unit:** the manager of the most members (`Principals.managerId` / `Identities.managerIdentityId`), when they manage at least 40 % of the members. Reason: "manager of 11 of the 14 members".
-  - **Resource unit or logical application:** the account that owns the most of its resources (holders of the ControlPermission resources linked by `HasOwnership` / `HasAppOwnership`), at least 40 %. Reason: "owner of 4 of its 6 groups".
+  - **Resource unit or logical application:** the account that owns the most of its resources (holders of the ControlPermission resources linked by `HasOwnership` / `HasAppOwnership`), at least 40 %. Reason: "owner of 4 of the 6 resources".
+  - A unit of one says "the only member"; a full sweep says "all 5 members".
   - A candidate rejected for this context is skipped.
 - `POST /api/contexts/:id/roles/suggestion/reject` body `{ principalId | identityId }` → 204. Stored in `ContextRoleSuggestionRejections` (migration 093: `id`, `contextId` → Contexts cascade, `principalId` | `identityId` (exactly one), `role`, `rejectedBy`, `rejectedAt`; unique per context + holder + role). Interim: moves into claims (POC step 2) when that lands.
 - Confirm is the existing `PUT /api/contexts/:id/roles` (Accountable).

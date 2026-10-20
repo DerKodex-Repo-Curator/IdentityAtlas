@@ -67,22 +67,30 @@ const OWNER_SQL = `
      ORDER BY count DESC, p."displayName", p.id
      LIMIT 1`;
 
+// "3 of the 4 members", but "the only member" / "all 5 members" rather than
+// "1 of the 1" / "5 of the 5".
+export function share(count, total, noun) {
+  if (total === 1) return `the only ${noun}`;
+  if (count === total) return `all ${total} ${noun}s`;
+  return `${count} of the ${total} ${noun}s`;
+}
+
 // targetType → how to find the candidate and how to say why.
 export const SIGNALS = {
   Identity: {
     holderCol: 'identityId',
     sql: managerSql({ table: 'Identities', managerCol: 'managerIdentityId', memberType: 'Identity', holderCol: 'identityId', live: always }),
-    reason: (count, total) => `manager of ${count} of the ${total} members`,
+    reason: (count, total) => `manager of ${share(count, total, 'member')}`,
   },
   Principal: {
     holderCol: 'principalId',
     sql: managerSql({ table: 'Principals', managerCol: 'managerId', memberType: 'Principal', holderCol: 'principalId', live: liveDeletedAt }),
-    reason: (count, total) => `manager of ${count} of the ${total} members`,
+    reason: (count, total) => `manager of ${share(count, total, 'member')}`,
   },
   Resource: {
     holderCol: 'principalId',
     sql: OWNER_SQL,
-    reason: (count, total) => `owner of ${count} of its ${total} resources`,
+    reason: (count, total) => `owner of ${share(count, total, 'resource')}`,
   },
 };
 

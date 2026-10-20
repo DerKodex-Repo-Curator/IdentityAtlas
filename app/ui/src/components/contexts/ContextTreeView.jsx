@@ -5,6 +5,7 @@ import {
 } from '@dnd-kit/core';
 import { variantMeta, targetTypeMeta, editedMeta } from '@ui/utils/contextStyles';
 import { parseOrg, computeChildLabels, stripSiblingPrefix } from './ContextTreeView.helpers.js';
+import { MemberOval, DraggableMemberOval, MemberDragPill, RenameInput, DragPill, MemberCount } from './ContextTreeParts';
 
 // Recursive tree renderer. Each node is a rounded pill with a variant-colored
 // bubble; connector lines between parent and child make the hierarchy
@@ -17,6 +18,12 @@ import { parseOrg, computeChildLabels, stripSiblingPrefix } from './ContextTreeV
 //   • use the "+" affordance to add a manual child context
 // All three call back into ContextsPage, which PATCHes/POSTs and refetches so
 // member counts (direct + total) stay correct after every structural change.
+//
+// Selection mode (the Contexts page's left pane): with `onSelect`, a click
+// selects the node (highlighted while its id is `selectedId`) instead of
+// opening it. A node flagged `childrenPending` has children not read yet: it
+// shows an expander, starts collapsed, and calls `onExpandNode(id)` when
+// opened. `memberMovable(root)` limits the member drag to some top-level trees.
 
 const INDENT_PX = 22;  // horizontal offset per depth level
 const CONNECTOR = 'rgb(203 213 225)'; // slate-300 — matches the bubble ring
@@ -63,7 +70,7 @@ function findNode(nodes, id) {
 // stripSiblingPrefix) live in ContextTreeView.helpers.js so this file only
 // exports its component.
 
-export default function ContextTreeView({ nodes, onOpenDetail, onReparent, onRename, onAddChild, onLoadMembers, onOpenMember, onMoveMember }) {
+export default function ContextTreeView({ nodes, onOpenDetail, onReparent, onRename, onAddChild, onLoadMembers, onOpenMember, onMoveMember, selectedId, onSelect, onExpandNode, memberMovable }) {
   const sensors = useSensors(
     // 6px activation distance — a plain click still opens the detail; only a
     // deliberate drag starts a re-parent.
@@ -96,7 +103,9 @@ export default function ContextTreeView({ nodes, onOpenDetail, onReparent, onRen
       const next = new Set(prev);
       const walk = (list, depth) => {
         for (const n of list) {
-          if (!seededRef.current.has(n.id)) {
+          // A node whose children are not read yet stays collapsed; it is
+          // seeded once they arrive.
+          if (!n.childrenPending && !seededRef.current.has(n.id)) {
             seededRef.current.add(n.id);
             if (depth < 2) next.add(n.id);
           }
@@ -147,8 +156,13 @@ export default function ContextTreeView({ nodes, onOpenDetail, onReparent, onRen
 
   const rootLabels = useMemo(() => stripSiblingPrefix(nodes), [nodes]);
 
+  // Pass-through props every node (and, recursively, its children) inherits.
+  const shared = {
+    onOpenDetail, onRename, onAddChild, onLoadMembers, onOpenMember, onSelect, onExpandNode, selectedId,
+    editable, forbidden, dragging: !!activeId || !!activeMember, isExpanded, toggleExpanded, setExpanded,
+  };
   const treeBody = (
-    <div className="p-4">
+    <div className={onSelect ? 'p-2' : 'p-4'}>
       <ul className="text-sm space-y-1">
         {nodes.map(n => (
           <TreeNode
@@ -157,18 +171,8 @@ export default function ContextTreeView({ nodes, onOpenDetail, onReparent, onRen
             displayLabel={rootLabels.get(n.id)}
             depth={0}
             isLast={true}
-            onOpenDetail={onOpenDetail}
-            onRename={onRename}
-            onAddChild={onAddChild}
-            onLoadMembers={onLoadMembers}
-            onOpenMember={onOpenMember}
-            editable={editable}
-            memberDraggable={memberMoveEnabled}
-            forbidden={forbidden}
-            dragging={!!activeId || !!activeMember}
-            isExpanded={isExpanded}
-            toggleExpanded={toggleExpanded}
-            setExpanded={setExpanded}
+            {...shared}
+            memberDraggable={memberMoveEnabled && (!memberMovable || memberMovable(n))}
           />
         ))}
       </ul>
@@ -195,27 +199,16 @@ export default function ContextTreeView({ nodes, onOpenDetail, onReparent, onRen
   );
 }
 
-function TreeNode({ node, displayLabel, depth, isLast, onOpenDetail, onRename, onAddChild, onLoadMembers, onOpenMember, editable, memberDraggable, forbidden, dragging, isExpanded, toggleExpanded, setExpanded }) {
-  const expanded = isExpanded(node.id);
-  const [renaming, setRenaming] = useState(false);
-  const [addingChild, setAddingChild] = useState(false);
-  const nodeLabel = displayLabel || node.displayName;
-
-  // Opt-in: members (the actual users) are hidden until the analyst clicks the
-  // member toggle, then shown nested inside the node. Lazy-loaded on first open.
-  const [showMembers, setShowMembers] = useState(false);
-  const { members, memberTotal } = useNodeMembers(node.id, node.directMemberCount, showMembers, onLoadMembers);
-  const canShowMembers = typeof onLoadMembers === 'function' && node.directMemberCount > 0;
-  const memberKind = MEMBER_KIND[node.targetType] || 'user';
-  // Single click opens the detail; double click renames. We delay the open so a
-  // double-click can cancel it — otherwise the first click navigates away before
-  // the rename can fire.
+// Single click activates (selects, or opens the detail); double click renames.
+// In an editable tree the activation is delayed so a double-click can cancel
+// it — otherwise the first click would act before the rename can fire.
+function useNodeClick(node, { editable, onSelect, onOpenDetail, setRenaming }) {
   const clickTimerRef = useRef(null);
-  const openDetail = () => onOpenDetail(node.id, node.displayName);
+  const activate = () => (onSelect ? onSelect(node.id, node.displayName) : onOpenDetail?.(node.id, node.displayName));
   const handleClick = () => {
-    if (!editable) { openDetail(); return; }
+    if (!editable) { activate(); return; }
     if (clickTimerRef.current) return;
-    clickTimerRef.current = setTimeout(() => { clickTimerRef.current = null; openDetail(); }, 220);
+    clickTimerRef.current = setTimeout(() => { clickTimerRef.current = null; activate(); }, 220);
   };
   const handleDoubleClick = (e) => {
     if (!editable) return;
@@ -223,60 +216,91 @@ function TreeNode({ node, displayLabel, depth, isLast, onOpenDetail, onRename, o
     if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
     setRenaming(true);
   };
-  const hasChildren = node.children && node.children.length > 0;
-  const v = variantMeta(node.variant);
-  const t = targetTypeMeta(node.targetType);
-  const edited = editedMeta(node);
+  return { handleClick, handleDoubleClick };
+}
 
-  // Root of the displayed subtree can't be dragged (it has no parent to change
-  // within this view); everything below it can.
+// The drag (re-parent) and drop (become-a-child-of) wiring of one node. The
+// root of the displayed tree can't be dragged (it has no parent to change
+// within this view); everything below it can.
+function useNodeDnd(node, { editable, depth, renaming, dragging, forbidden }) {
   const canDrag = editable && depth > 0 && !renaming;
-
-  const { setNodeRef: dragRef, listeners, attributes, isDragging } = useDraggable({
-    id: node.id, disabled: !canDrag,
-  });
+  const { setNodeRef: dragRef, listeners, attributes, isDragging } = useDraggable({ id: node.id, disabled: !canDrag });
   const { setNodeRef: dropRef, isOver } = useDroppable({ id: node.id, disabled: !editable });
-
   const isForbiddenTarget = dragging && forbidden.has(node.id);
   const isValidDropTarget = isOver && dragging && !isForbiddenTarget;
+  return { canDrag, dragRef, listeners, attributes, isDragging, dropRef, isForbiddenTarget, isValidDropTarget };
+}
 
-  // Pass-through props the recursive child nodes inherit unchanged.
-  const shared = {
-    onOpenDetail, onRename, onAddChild, onLoadMembers, onOpenMember,
-    isExpanded, toggleExpanded, setExpanded, editable, memberDraggable, forbidden, dragging,
+// The connector line from a child up to its parent.
+function NodeConnector({ depth, isLast }) {
+  if (depth === 0) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute"
+      style={{
+        left: `${(depth - 1) * INDENT_PX + 10}px`,
+        top: 0,
+        bottom: isLast ? '50%' : 0,
+        width: `${INDENT_PX - 2}px`,
+        borderLeft: `1px solid ${CONNECTOR}`,
+        borderBottom: `1px solid ${CONNECTOR}`,
+        borderBottomLeftRadius: '6px',
+      }}
+    />
+  );
+}
+
+// What sits below an expanded node: "Loading…" while its children are read,
+// else the children themselves.
+function NodeBelow({ node, depth, expanded, shared }) {
+  if (!expanded) return null;
+  if (node.childrenPending) {
+    return (
+      <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400" style={{ paddingLeft: `${(depth + 1) * INDENT_PX + 28}px` }}>
+        Loading…
+      </div>
+    );
+  }
+  return node.children?.length > 0 ? <NodeChildren node={node} depth={depth} shared={shared} /> : null;
+}
+
+function TreeNode({ node, displayLabel, depth, isLast, memberDraggable, ...shared }) {
+  const { onRename, onAddChild, onLoadMembers, onOpenMember, onExpandNode, onSelect, selectedId, editable, dragging, isExpanded, toggleExpanded, setExpanded } = shared;
+  const expanded = isExpanded(node.id);
+  const [renaming, setRenaming] = useState(false);
+  const [addingChild, setAddingChild] = useState(false);
+
+  // Opt-in: members (the actual users) are hidden until the analyst clicks the
+  // member toggle, then shown nested inside the node. Lazy-loaded on first open.
+  const [showMembers, setShowMembers] = useState(false);
+  const { members, memberTotal } = useNodeMembers(node.id, node.directMemberCount, showMembers, onLoadMembers);
+  const canShowMembers = typeof onLoadMembers === 'function' && node.directMemberCount > 0;
+  const { handleClick, handleDoubleClick } = useNodeClick(node, { ...shared, setRenaming });
+  const hasChildren = !!node.childrenPending || node.children?.length > 0;
+  const { canDrag, dragRef, listeners, attributes, isDragging, dropRef, isForbiddenTarget, isValidDropTarget } = useNodeDnd(node, { ...shared, depth, renaming });
+  const toggle = () => {
+    if (!expanded && node.childrenPending) onExpandNode?.(node.id);
+    toggleExpanded(node.id);
   };
 
   return (
     <li className="relative">
-      {depth > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute"
-          style={{
-            left: `${(depth - 1) * INDENT_PX + 10}px`,
-            top: 0,
-            bottom: isLast ? '50%' : 0,
-            width: `${INDENT_PX - 2}px`,
-            borderLeft: `1px solid ${CONNECTOR}`,
-            borderBottom: `1px solid ${CONNECTOR}`,
-            borderBottomLeftRadius: '6px',
-          }}
-        />
-      )}
+      <NodeConnector depth={depth} isLast={isLast} />
 
       <div
         ref={dropRef}
         className="group flex items-center gap-2 rounded-full"
         style={{ paddingLeft: `${depth * INDENT_PX}px`, opacity: isDragging ? 0.4 : 1 }}
       >
-        <ExpandToggle hasChildren={hasChildren} expanded={expanded} onToggle={() => toggleExpanded(node.id)} />
+        <ExpandToggle hasChildren={hasChildren} expanded={expanded} onToggle={toggle} label={node.displayName} />
 
         <NodeChip
-          node={node} nodeLabel={nodeLabel} renaming={renaming} setRenaming={setRenaming} onRename={onRename}
+          node={node} nodeLabel={displayLabel || node.displayName} renaming={renaming} setRenaming={setRenaming} onRename={onRename}
           dragRef={dragRef} listeners={listeners} attributes={attributes}
           handleClick={handleClick} handleDoubleClick={handleDoubleClick}
           canDrag={canDrag} isValidDropTarget={isValidDropTarget} isForbiddenTarget={isForbiddenTarget}
-          edited={edited} v={v} t={t}
+          selected={!!onSelect && selectedId === node.id} selectMode={!!onSelect}
         />
 
         {/* Member toggle — show/hide the actual users nested inside this node. */}
@@ -290,7 +314,7 @@ function TreeNode({ node, displayLabel, depth, isLast, onOpenDetail, onRename, o
       {showMembers && (
         <NodeMembersPanel
           members={members} memberTotal={memberTotal} depth={depth}
-          memberDraggable={memberDraggable} nodeId={node.id} memberKind={memberKind}
+          memberDraggable={memberDraggable} nodeId={node.id} memberKind={MEMBER_KIND[node.targetType] || 'user'}
           onOpenMember={onOpenMember}
         />
       )}
@@ -306,16 +330,17 @@ function TreeNode({ node, displayLabel, depth, isLast, onOpenDetail, onRename, o
         </div>
       )}
 
-      {hasChildren && expanded && <NodeChildren node={node} depth={depth} shared={shared} />}
+      <NodeBelow node={node} depth={depth} expanded={expanded} shared={{ ...shared, memberDraggable }} />
     </li>
   );
 }
 
-function ExpandToggle({ hasChildren, expanded, onToggle }) {
+function ExpandToggle({ hasChildren, expanded, onToggle, label }) {
   if (!hasChildren) return <span className="w-5 h-5 inline-block shrink-0" />;
   return (
     <button
       aria-expanded={expanded}
+      aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label}`}
       onClick={onToggle}
       className="w-5 h-5 flex items-center justify-center text-gray-600 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded shrink-0"
       title={expanded ? 'Collapse' : 'Expand'}
@@ -357,24 +382,32 @@ function AddChildButton({ editable, renaming, dragging, onClick }) {
   );
 }
 
-function chipClass({ canDrag, isValidDropTarget, edited, isForbiddenTarget }) {
-  const dropState = isValidDropTarget
-    ? 'border-blue-500 ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-50 dark:bg-blue-900/30'
-    : edited
-      ? `border-amber-300 dark:border-amber-700 ${edited.ringClass}`
-      : 'border-slate-200 dark:border-gray-600';
+function chipClass({ canDrag, isValidDropTarget, edited, isForbiddenTarget, selected }) {
+  let dropState = 'border-slate-200 dark:border-gray-600';
+  if (isValidDropTarget) dropState = 'border-blue-500 ring-2 ring-blue-400 dark:ring-blue-500 bg-blue-50 dark:bg-blue-900/30';
+  else if (selected) dropState = 'border-blue-500 dark:border-blue-400 ring-1 ring-blue-400 dark:ring-blue-500';
+  else if (edited) dropState = `border-amber-300 dark:border-amber-700 ${edited.ringClass}`;
   return [
-    'flex items-center gap-2 min-w-0 px-3 py-1.5 rounded-full border bg-white dark:bg-gray-800 text-left shrink max-w-full transition-shadow',
-    'hover:bg-slate-50 dark:bg-gray-700/50 hover:border-slate-300 dark:border-gray-500 hover:shadow-sm',
+    'flex items-center gap-2 min-w-0 px-3 py-1.5 rounded-full border text-left shrink max-w-full transition-shadow',
+    selected ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700/50',
+    'hover:border-slate-300 dark:hover:border-gray-500 hover:shadow-sm',
     canDrag ? 'cursor-grab active:cursor-grabbing' : '',
     dropState,
     isForbiddenTarget ? 'opacity-50' : '',
   ].join(' ');
 }
 
+function chipTitle(canDrag, selectMode) {
+  if (!canDrag) return undefined;
+  return `Click to ${selectMode ? 'select' : 'open'} · double-click to rename · drag onto another node to re-parent`;
+}
+
 // The node's own pill: an inline rename field while renaming, else the draggable
 // label button with variant dot, type badge, edited badge and member count.
-function NodeChip({ node, nodeLabel, renaming, setRenaming, onRename, dragRef, listeners, attributes, handleClick, handleDoubleClick, canDrag, isValidDropTarget, isForbiddenTarget, edited, v, t }) {
+function NodeChip({ node, nodeLabel, renaming, setRenaming, onRename, dragRef, listeners, attributes, handleClick, handleDoubleClick, canDrag, isValidDropTarget, isForbiddenTarget, selected, selectMode }) {
+  const v = variantMeta(node.variant);
+  const t = targetTypeMeta(node.targetType);
+  const edited = editedMeta(node);
   if (renaming) {
     return (
       <RenameInput
@@ -391,8 +424,9 @@ function NodeChip({ node, nodeLabel, renaming, setRenaming, onRename, dragRef, l
       {...attributes}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      title={canDrag ? 'Click to open · double-click to rename · drag onto another node to re-parent' : undefined}
-      className={chipClass({ canDrag, isValidDropTarget, edited, isForbiddenTarget })}
+      aria-current={selected ? 'true' : undefined}
+      title={chipTitle(canDrag, selectMode)}
+      className={chipClass({ canDrag, isValidDropTarget, edited, isForbiddenTarget, selected })}
     >
       <span
         className={`w-2.5 h-2.5 rounded-full ${v.dotClass} ring-2 ring-white outline outline-1 outline-slate-200 shrink-0`}
@@ -463,101 +497,4 @@ function NodeChildren({ node, depth, shared }) {
       ))}
     </ul>
   );
-}
-
-// A user (member) shown as a small oval nested inside its context. Click opens
-// the user's detail.
-function MemberOval({ member, onOpen }) {
-  return (
-    <button
-      onClick={onOpen}
-      title={member.displayName}
-      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-[11px] text-left max-w-[220px] hover:border-sky-300 dark:hover:border-sky-700 hover:shadow-sm"
-    >
-      <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" aria-hidden="true" />
-      <span className="text-gray-800 dark:text-gray-200 truncate">{member.displayName}</span>
-    </button>
-  );
-}
-
-// In an editable Manager-Hierarchy tree the member ovals are draggable: drop one
-// onto another team to change who this person reports to (a 6px activation
-// distance keeps a plain click opening the detail). The drag carries the member
-// + its current context so the drop handler can move it.
-function DraggableMemberOval({ member, fromContextId, onOpen }) {
-  const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
-    id: `m:${fromContextId}:${member.id}`,
-    data: { type: 'member', memberId: member.id, fromContextId, displayName: member.displayName },
-  });
-  return (
-    <button
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={onOpen}
-      title={`${member.displayName} — drag onto another team to move`}
-      style={{ opacity: isDragging ? 0.4 : 1 }}
-      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-[11px] text-left max-w-[220px] cursor-grab active:cursor-grabbing hover:border-sky-300 dark:hover:border-sky-700 hover:shadow-sm"
-    >
-      <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" aria-hidden="true" />
-      <span className="text-gray-800 dark:text-gray-200 truncate">{member.displayName}</span>
-    </button>
-  );
-}
-
-// The member oval rendered under the cursor while dragging it to a new team.
-function MemberDragPill({ displayName }) {
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-sky-400 bg-white dark:bg-gray-800 text-[11px] shadow-lg cursor-grabbing">
-      <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" aria-hidden="true" />
-      <span className="text-gray-800 dark:text-gray-200 truncate max-w-[200px]">{displayName}</span>
-    </div>
-  );
-}
-
-// Inline text editor reused for rename and add-child. Commits on Enter / blur,
-// cancels on Escape.
-function RenameInput({ initial, placeholder, onCommit, onCancel }) {
-  const [value, setValue] = useState(initial || '');
-  return (
-    <input
-      autoFocus
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onCommit(value.trim());
-        else if (e.key === 'Escape') onCancel();
-      }}
-      onBlur={() => onCommit(value.trim())}
-      className="w-full min-w-[260px] max-w-[480px] px-2 py-1 text-sm border border-blue-400 dark:border-blue-500 rounded bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-    />
-  );
-}
-
-// The pill rendered under the cursor while dragging.
-function DragPill({ node }) {
-  const v = variantMeta(node.variant);
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-400 bg-white dark:bg-gray-800 shadow-lg cursor-grabbing">
-      <span className={`w-2.5 h-2.5 rounded-full ${v.dotClass} ring-2 ring-white outline outline-1 outline-slate-200`} aria-hidden="true" />
-      <span className="font-medium text-gray-900 dark:text-white truncate max-w-[220px]">{node.displayName}</span>
-    </div>
-  );
-}
-
-// Shows "<direct> direct" for leaves and "<direct> · <total>" for subtree
-// nodes so the weight carried under an expanded node is obvious at a glance.
-function MemberCount({ direct, total }) {
-  if (typeof direct !== 'number' && typeof total !== 'number') return null;
-  const d = direct || 0;
-  const t = total  || 0;
-  if (t > d) {
-    return (
-      <span className="text-[11px] text-gray-600 dark:text-gray-500 whitespace-nowrap shrink-0">
-        {d} · <span className="text-gray-600 dark:text-gray-400">{t}</span>
-      </span>
-    );
-  }
-  return <span className="text-[11px] text-gray-600 dark:text-gray-500 whitespace-nowrap shrink-0">{d}</span>;
 }

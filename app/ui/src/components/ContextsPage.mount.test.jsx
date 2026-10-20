@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createElement as h } from 'react';
 import ContextsPage from './ContextsPage';
 import {
@@ -12,335 +12,353 @@ import {
   userEvent,
 } from '@ui/test-utils/renderWithProviders';
 
-// Two root trees: a generated one (selectable, deletable, syncable) and a
-// synced one (delete blocked by API). The first root auto-selects on load.
-const roots = {
-  data: [
-    {
-      id: 'root-gen',
-      displayName: 'Engineering Org',
-      variant: 'generated',
-      targetType: 'Identity',
-      contextType: 'ManagerHierarchy',
-      contextCategory: 'OrganizationalUnit',
-      sourceAlgorithmName: 'manager-hierarchy',
-      sourceAlgorithmDisplayName: 'Manager Hierarchy',
-      directMemberCount: 1,
-      totalMemberCount: 4,
-    },
-    {
-      id: 'root-synced',
-      displayName: 'Sales OUs',
-      variant: 'synced',
-      targetType: 'Identity',
-      contextType: 'OrgUnit',
-      contextCategory: 'OrganizationalUnit',
-      scopeSystemId: 3,
-      scopeSystemName: 'Active Directory',
-      directMemberCount: 0,
-      totalMemberCount: 9,
-      // The owner as the read endpoint hands it over: the raw value the source
-      // gave, plus the principal it resolved to.
-      ownerUserId: 'IIQ-4711',
-      ownerPrincipalId: 'p-owner',
-      ownerDisplayName: 'Leo M. Cohen',
-    },
-  ],
+beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
+
+// Three organisation roots: a generated people tree from the manager-hierarchy
+// plugin (selectable, deletable, syncable), a synced people tree (delete
+// blocked by the API) and an accounts tree — the generated tree's variant.
+const GEN = {
+  id: 'root-gen', displayName: 'Engineering Org', variant: 'generated', targetType: 'Identity',
+  contextType: 'ManagerHierarchy', contextCategory: 'OrganizationalUnit',
+  sourceAlgorithmName: 'manager-hierarchy', sourceAlgorithmDisplayName: 'Manager Hierarchy',
+  directMemberCount: 1, totalMemberCount: 4,
 };
+const SYNCED = {
+  id: 'root-synced', displayName: 'Sales OUs', variant: 'synced', targetType: 'Identity',
+  contextType: 'OrgUnit', contextCategory: 'OrganizationalUnit', scopeSystemId: 3, scopeSystemName: 'Active Directory',
+  directMemberCount: 2, totalMemberCount: 9,
+  // The owner as the read endpoint hands it over: the raw value the source
+  // gave, plus the principal it resolved to.
+  ownerUserId: 'IIQ-4711', ownerPrincipalId: 'p-owner', ownerDisplayName: 'Leo M. Cohen',
+};
+const ACC = {
+  id: 'root-acc', displayName: 'Engineering Org', variant: 'generated', targetType: 'Principal',
+  contextType: 'ManagerHierarchy', contextCategory: 'OrganizationalUnit', directMemberCount: 7, totalMemberCount: 7,
+};
+const ROOTS = [GEN, SYNCED, ACC];
 
-// Subtree for root-gen: a single root node with two children (returned as an
-// ARRAY of nodes, per /api/contexts/tree).
-const genSubtree = [
-  {
-    id: 'root-gen',
-    displayName: 'Engineering Org',
-    variant: 'generated',
-    targetType: 'Identity',
-    contextType: 'ManagerHierarchy',
-    directMemberCount: 1,
-    totalMemberCount: 4,
-    children: [
-      {
-        id: 'child-backend',
-        displayName: 'Backend Squad',
-        variant: 'generated',
-        targetType: 'Identity',
-        contextType: 'ManagerHierarchy',
-        directMemberCount: 2,
-        totalMemberCount: 2,
-        children: [],
-      },
-      {
-        id: 'child-frontend',
-        displayName: 'Frontend Squad',
-        variant: 'generated',
-        targetType: 'Identity',
-        contextType: 'ManagerHierarchy',
-        directMemberCount: 1,
-        totalMemberCount: 1,
-        children: [],
-      },
-    ],
-  },
-];
+const child = (id, displayName, extra = {}) => ({
+  id, displayName, variant: 'generated', targetType: 'Identity', contextType: 'ManagerHierarchy',
+  contextCategory: 'OrganizationalUnit', directMemberCount: 2, totalMemberCount: 2, children: [], ...extra,
+});
+const BACKEND = child('child-backend', 'Backend Squad');
+const FRONTEND = child('child-frontend', 'Frontend Squad', { directMemberCount: 1, totalMemberCount: 1 });
+const EMEA = child('child-emea', 'EMEA Sales', { variant: 'synced' });
 
-// Order matters: /api/contexts/tree must be keyed before the bare /api/contexts
-// roots key (most-specific first).
-function routes(overrides = {}) {
-  return makeAuthFetch({
-    '/api/contexts/tree': genSubtree,
-    '/api/contexts': roots,
-    ...overrides,
+// /api/contexts/tree?root=<id> answers an ARRAY holding the root with children.
+const SUBTREES = {
+  'root-gen': [{ ...GEN, children: [BACKEND, FRONTEND] }],
+  'root-synced': [{ ...SYNCED, children: [EMEA] }],
+  'root-acc': [{ ...ACC, children: [] }],
+};
+const ALL = Object.fromEntries([...ROOTS, BACKEND, FRONTEND, EMEA].map(c => [c.id, c]));
+// The generated people tree is the same unit as the accounts tree.
+const RELATIONSHIPS = {
+  'root-gen': [{ relationshipType: 'SameUnitAs', relatedContextId: 'root-acc', relatedDisplayName: 'Engineering Org', relatedTargetType: 'Principal', relatedTotalMemberCount: 7 }],
+  'root-acc': [{ relationshipType: 'SameUnitAs', relatedContextId: 'root-gen', relatedDisplayName: 'Engineering Org', relatedTargetType: 'Identity', relatedTotalMemberCount: 4 }],
+};
+const MEMBERS = { total: 1, data: [{ id: 'u-1', displayName: 'Ada Lovelace', principalType: 'User' }] };
+
+// The API: roots, subtrees, one detail per context and its sub-resources.
+// `answer(url, opts)` handles a route first; undefined falls through.
+function api({ roots = ROOTS, answer = () => undefined } = {}) {
+  return makeAuthFetch((url, opts = {}) => {
+    const u = String(url);
+    const hit = answer(u, opts);
+    if (hit !== undefined) return hit;
+    const tree = /^\/api\/contexts\/tree\?root=([^&]+)/.exec(u);
+    if (tree) return SUBTREES[decodeURIComponent(tree[1])] || [];
+    if (u === '/api/contexts') return { data: roots };
+    const m = /^\/api\/contexts\/([^/?]+)(\/[^?]*)?/.exec(u);
+    if (!m) return undefined;
+    const [, id, sub] = m;
+    if (!sub) return ALL[id] ? { attributes: ALL[id], subContexts: [] } : undefined;
+    if (sub === '/members') return MEMBERS;
+    if (sub === '/relationships') return RELATIONSHIPS[id] || [];
+    if (sub === '/roles') return [];
+    return undefined;
   });
 }
 
-describe('ContextsPage (mounted)', () => {
-  it('loads roots, auto-selects the first, and renders its subtree', async () => {
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch: routes() } });
+function mount({ onOpenDetail = vi.fn(), ...opts } = {}) {
+  const authFetch = api(opts);
+  renderWithProviders(h(ContextsPage, { onOpenDetail }), { auth: { authFetch } });
+  return { authFetch, onOpenDetail, user: userEvent.setup() };
+}
 
-    // Left selector lists both roots.
+const detailPane = () => screen.getByTestId('context-detail-pane');
+// The context the right pane shows: its header's heading.
+const shownContext = async (name) => {
+  await waitFor(() => expect(within(detailPane()).getByRole('heading', { level: 2 })).toHaveTextContent(name));
+};
+// A node of the left tree, by its name (the chip carries the name and badges).
+const node = (name) => {
+  const pane = screen.queryByTestId('context-detail-pane');
+  return screen.getAllByRole('button').find(b =>
+    b.closest('li') && !pane?.contains(b) && !b.hasAttribute('aria-expanded') && b.textContent.startsWith(name));
+};
+// The left tree (its top-level list), to keep member ovals apart from the detail's members table.
+const tree = () => node('Engineering Org').closest('ul');
+const treeCalls = (authFetch) => authFetch.mock.calls.map(([u]) => String(u)).filter(u => u.startsWith('/api/contexts/tree'));
+
+describe('ContextsPage — the tree on the left', () => {
+  it('lists every root of the tab as a top-level node and opens on the first, reading only its subtree', async () => {
+    const { authFetch } = mount();
+    // Both people trees are top-level nodes; the accounts tree waits behind the kind switch.
     expect(await screen.findByText('Sales OUs')).toBeInTheDocument();
-
-    // First root auto-selected → header + subtree children render on the right.
     expect(await screen.findByText('Backend Squad')).toBeInTheDocument();
     expect(screen.getByText('Frontend Squad')).toBeInTheDocument();
-
-    // SelectedRootHeader shows the generated tree's Sync + Delete affordances.
+    expect(node('Engineering Org')).toHaveAttribute('aria-current', 'true');
+    await shownContext('Engineering Org');
+    // Only the selected root's subtree was read; the other root is still collapsed.
+    expect(treeCalls(authFetch)).toEqual(['/api/contexts/tree?root=root-gen']);
+    expect(screen.queryByText('EMEA Sales')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Expand Sales OUs' })).toHaveAttribute('aria-expanded', 'false');
+    // The tree that holds the selection offers its actions.
     expect(screen.getByText('Sync')).toBeInTheDocument();
     expect(screen.getByText('Delete tree…')).toBeInTheDocument();
+    // The pane is captioned with where the trees come from.
+    expect(screen.getByTitle('Where these trees come from')).toHaveTextContent('Manager Hierarchy · Active Directory');
   });
 
-  it('toggles between tree and list view modes', async () => {
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch: routes() } });
-    const user = userEvent.setup();
-
+  it('expanding a root reads its subtree then, and only once', async () => {
+    const { authFetch, user } = mount();
     await screen.findByText('Backend Squad');
+    await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
+    expect(await screen.findByText('EMEA Sales')).toBeInTheDocument();
+    expect(treeCalls(authFetch)).toEqual(['/api/contexts/tree?root=root-gen', '/api/contexts/tree?root=root-synced']);
+    // Collapse and expand again: no second read.
+    await user.click(screen.getByRole('button', { name: 'Collapse Sales OUs' }));
+    expect(screen.queryByText('EMEA Sales')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
+    expect(await screen.findByText('EMEA Sales')).toBeInTheDocument();
+    expect(treeCalls(authFetch)).toHaveLength(2);
+    // Expanding does not select: the right pane still shows the first root.
+    await shownContext('Engineering Org');
+  });
 
-    // Switch to list view — the list view renders a name filter input.
-    await user.click(screen.getByRole('button', { name: 'List' }));
-    expect(await screen.findByPlaceholderText('Filter by name…')).toBeInTheDocument();
-    expect(screen.getByText(/nodes$/)).toBeInTheDocument();
+  it('selecting a node shows its detail on the right, without opening a tab', async () => {
+    const { onOpenDetail, user } = mount();
+    await screen.findByText('Backend Squad');
+    await user.click(node('Backend Squad'));
+    await shownContext('Backend Squad');
+    expect(node('Backend Squad')).toHaveAttribute('aria-current', 'true');
+    expect(node('Engineering Org')).not.toHaveAttribute('aria-current');
+    expect(onOpenDetail).not.toHaveBeenCalled();
+    // The tree actions stay with the tree that holds the selection.
+    expect(screen.getByText('Sync')).toBeInTheDocument();
+  });
 
-    // Switch back to tree view.
-    await user.click(screen.getByRole('button', { name: 'Tree' }));
-    expect(await screen.findByText('Backend Squad')).toBeInTheDocument();
+  it('"Open as page" opens the shown context in its own tab', async () => {
+    const { onOpenDetail, user } = mount();
+    await screen.findByText('Backend Squad');
+    await user.click(node('Backend Squad'));
+    await shownContext('Backend Squad');
+    await user.click(within(detailPane()).getByRole('button', { name: 'Open as page' }));
+    expect(onOpenDetail).toHaveBeenCalledWith('context', 'child-backend', 'Backend Squad');
+    // Embedded, the detail has no close button.
+    expect(within(detailPane()).queryByTitle('Close')).toBeNull();
   });
 
   it('selecting the synced root hides the sync/delete affordances', async () => {
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch: routes() } });
-    const user = userEvent.setup();
-
-    await screen.findByText('Sales OUs');
-    await user.click(screen.getByText('Sales OUs'));
-
-    // Synced trees: no Sync (only generated) and no Delete (API blocks it).
-    expect(await screen.findByRole('button', { name: 'Tree' })).toBeInTheDocument();
+    const { user } = mount();
+    await screen.findByText('Backend Squad');
+    await user.click(node('Sales OUs'));
+    await shownContext('Sales OUs');
+    // Selecting a root also reads its subtree, so it opens.
+    expect(await screen.findByText('EMEA Sales')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tree' })).toBeInTheDocument();
     expect(screen.queryByText('Sync')).not.toBeInTheDocument();
     expect(screen.queryByText('Delete tree…')).not.toBeInTheDocument();
   });
 
-  it('shows the selected tree owner as a person and opens that account', async () => {
-    const onOpenDetail = vi.fn();
-    renderWithProviders(h(ContextsPage, { onOpenDetail }), { auth: { authFetch: routes() } });
-    const user = userEvent.setup();
-
-    await screen.findByText('Sales OUs');
-    await user.click(screen.getByText('Sales OUs'));
-
+  it('shows the selected tree owner as a person and opens that account in a tab', async () => {
+    const { onOpenDetail, user } = mount();
+    await screen.findByText('Backend Squad');
+    await user.click(node('Sales OUs'));
     // The person, not the external id the source stored.
-    const owner = await screen.findByTitle('Owner id: IIQ-4711');
+    const owner = await within(detailPane()).findByTitle('Owner id: IIQ-4711');
     expect(owner.textContent).toContain('Leo M. Cohen');
     expect(owner.textContent).not.toContain('IIQ-4711');
-
     await user.click(owner);
     expect(onOpenDetail).toHaveBeenCalledWith('user', 'p-owner', 'Leo M. Cohen');
   });
 
-  it('runs the delete-tree confirm flow and calls DELETE', async () => {
-    const authFetch = routes();
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-    const user = userEvent.setup();
-
+  it('remembers the selection per kind of tree', async () => {
+    const { user } = mount();
     await screen.findByText('Backend Squad');
+    await user.click(node('Backend Squad'));
+    await shownContext('Backend Squad');
+    const kinds = screen.getByRole('group', { name: 'Kind of unit' });
+    await user.click(within(kinds).getByRole('button', { name: /^Accounts/ }));
+    await waitFor(() => expect(node('Engineering Org')).toHaveAttribute('aria-current', 'true'));
+    expect(screen.queryByText('Sales OUs')).toBeNull();
+    await user.click(within(kinds).getByRole('button', { name: /^People/ }));
+    await shownContext('Backend Squad');
+    expect(node('Backend Squad')).toHaveAttribute('aria-current', 'true');
+  });
+});
 
-    // Click "Delete tree…" → inline confirm appears.
+describe('ContextsPage — links inside the detail', () => {
+  it('a variant link selects that context in place and switches the kind of tree', async () => {
+    const { onOpenDetail, user } = mount();
+    await shownContext('Engineering Org');
+    // Scoped to the variants block: a role query over the whole page is slow.
+    const variants = await screen.findByTestId('unit-variants');
+    await user.click(await within(variants).findByRole('button', { name: 'Accounts 7' }));
+    // The accounts tree is now the one on the left, its root selected and shown.
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Kind of unit' })).getByRole('button', { name: /^Accounts/ })).toHaveAttribute('aria-pressed', 'true'));
+    await waitFor(() => expect(node('Engineering Org')).toHaveAttribute('aria-current', 'true'));
+    expect(screen.queryByText('Sales OUs')).toBeNull();
+    // The accounts variant is shown, with its people variant now the other choice.
+    await waitFor(() => expect(within(screen.getByTestId('unit-variants')).getByRole('button', { name: /^Accounts/ })).toHaveAttribute('aria-pressed', 'true'));
+    expect(onOpenDetail).not.toHaveBeenCalledWith('context', expect.anything(), expect.anything());
+  });
+});
+
+describe('ContextsPage — editing the tree', () => {
+  it('runs the delete-tree confirm flow, calls DELETE and falls back to the next tree', async () => {
+    let deleted = false;
+    const { authFetch, user } = mount({
+      answer: (u, opts) => {
+        if (opts.method === 'DELETE') { deleted = true; return jsonResponse(null, { ok: true, status: 204 }); }
+        if (u === '/api/contexts' && deleted) return { data: [SYNCED, ACC] };
+        return undefined;
+      },
+    });
+    await screen.findByText('Backend Squad');
     await user.click(screen.getByText('Delete tree…'));
     expect(await screen.findByText('Yes, delete')).toBeInTheDocument();
-
     // Cancel first to exercise that branch.
     await user.click(screen.getByText('Cancel'));
     expect(screen.queryByText('Yes, delete')).not.toBeInTheDocument();
-
-    // Re-open and confirm.
     await user.click(screen.getByText('Delete tree…'));
     await user.click(await screen.findByText('Yes, delete'));
-
-    expect(authFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/contexts/root-gen'),
-      expect.objectContaining({ method: 'DELETE' }),
-    );
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts/root-gen', expect.objectContaining({ method: 'DELETE' }));
+    await shownContext('Sales OUs');
   });
 
   it('surfaces a delete error when the API rejects', async () => {
-    // Function handler so the DELETE (a bare /api/contexts/root-gen URL) is
-    // matched before the more-general /api/contexts roots stub.
-    const authFetch = makeAuthFetch((url, opts = {}) => {
-      if (opts.method === 'DELETE') {
-        return jsonResponse({ error: 'tree is synced' }, { ok: false, status: 409 });
-      }
-      if (String(url).includes('/api/contexts/tree')) return genSubtree;
-      if (String(url).includes('/api/contexts')) return roots;
-      return jsonResponse({}, { ok: false, status: 404 });
+    const { user } = mount({
+      answer: (u, opts) => (opts.method === 'DELETE' ? jsonResponse({ error: 'tree is synced' }, { ok: false, status: 409 }) : undefined),
     });
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-    const user = userEvent.setup();
-
     await screen.findByText('Backend Squad');
     await user.click(screen.getByText('Delete tree…'));
     await user.click(await screen.findByText('Yes, delete'));
-
     expect(await screen.findByText('tree is synced')).toBeInTheDocument();
   });
 
-  it('opens the New Context wizard from the selector', async () => {
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch: routes() } });
-    const user = userEvent.setup();
-
-    await screen.findByText('Sales OUs');
-    await user.click(screen.getByRole('button', { name: '+ New' }));
-
-    // The wizard modal opens (its heading is "New context tree").
-    expect(await screen.findByText('New context tree')).toBeInTheDocument();
+  it('runs the Sync flow on a generated tree and re-reads the tree and the detail', async () => {
+    const { authFetch, user } = mount({ answer: (u, opts) => (u.includes('/sync') && opts.method === 'POST' ? { ok: true } : undefined) });
+    await shownContext('Engineering Org');
+    const detailReads = () => authFetch.mock.calls.filter(([u]) => u === '/api/contexts/root-gen').length;
+    const before = detailReads();
+    await user.click(screen.getByRole('button', { name: /Sync/i }));
+    await waitFor(() => expect(screen.getAllByText('Synced').some(el => el.className.includes('text-green-700'))).toBe(true));
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts/root-gen/sync', expect.objectContaining({ method: 'POST' }));
+    expect(treeCalls(authFetch).filter(u => u.endsWith('root-gen'))).toHaveLength(2);
+    await waitFor(() => expect(detailReads()).toBe(before + 1));
   });
 
-  it('forwards a node click to onOpenDetail', async () => {
-    const onOpenDetail = vi.fn();
-    renderWithProviders(h(ContextsPage, { onOpenDetail }), { auth: { authFetch: routes() } });
-    const user = userEvent.setup();
-
-    // In list view the node name is a plain button → easiest to click.
-    await screen.findByText('Backend Squad');
-    await user.click(screen.getByRole('button', { name: 'List' }));
-
-    const row = await screen.findByRole('button', { name: 'Backend Squad' });
-    await user.click(row);
-
-    expect(onOpenDetail).toHaveBeenCalledWith('context', 'child-backend', 'Backend Squad');
-  });
-
-  it('shows the roots-load error branch', async () => {
-    const authFetch = makeAuthFetch({
-      '/api/contexts': jsonResponse({ error: 'boom' }, { ok: false, status: 500 }),
-    });
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-
-    // Hook sets the error message to "HTTP 500"; the right pane renders it.
-    expect(await screen.findByText('HTTP 500')).toBeInTheDocument();
-    // With no roots + not loading, the empty-state prompt shows.
-    expect(screen.getByText(/Select a tree on the left/i)).toBeInTheDocument();
-  });
-
-  // Render the page over the generated tree, with one route answered by the
-  // test and everything else falling through to the shared fixtures.
-  function renderOverGenTree(answer) {
-    const authFetch = makeAuthFetch((url, opts = {}) => {
-      const hit = answer(String(url), opts);
-      if (hit !== undefined) return hit;
-      if (String(url).includes('/api/contexts/tree')) return genSubtree;
-      if (String(url).includes('/api/contexts')) return roots;
-      return jsonResponse({}, { ok: false, status: 404 });
-    });
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-    return { authFetch, user: userEvent.setup() };
-  }
-
-  it('runs the Sync flow on a generated tree', async () => {
-    // POST /sync returns no runId → the poll loop is skipped, refresh runs,
-    // and the "Synced" confirmation appears.
-    const { authFetch, user } = renderOverGenTree((url, opts) => (url.includes('/sync') && opts.method === 'POST' ? { ok: true } : undefined));
-
+  it('shows the API error when a sync is refused', async () => {
+    const { user } = mount({ answer: (u, opts) => (u.includes('/sync') && opts.method === 'POST' ? jsonResponse({ error: 'plugin disabled' }, { ok: false, status: 409 }) : undefined) });
     await screen.findByText('Backend Squad');
     await user.click(screen.getByRole('button', { name: /Sync/i }));
-
-    // The green "Synced" confirmation appears (distinct from the "Synced"
-    // variant-filter option / badge — match the green status class).
-    await waitFor(() => {
-      const synced = screen.getAllByText('Synced').find(el =>
-        el.className.includes('text-green-700'),
-      );
-      expect(synced).toBeTruthy();
-    });
-    expect(authFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/contexts/root-gen/sync'),
-      expect.objectContaining({ method: 'POST' }),
-    );
+    expect(await screen.findByText('plugin disabled')).toBeInTheDocument();
   });
 
-  it('lazy-loads a node\'s members when its member toggle is expanded', async () => {
-    const memberData = {
-      total: 1,
-      data: [{ id: 'u-1', displayName: 'Ada Lovelace', principalType: 'User' }],
-    };
-    const { authFetch, user } = renderOverGenTree((url) => (url.includes('/members') ? memberData : undefined));
-
+  it('lazy-loads a node\'s members, and lets a person be dragged only in the manager-hierarchy tree', async () => {
+    const { authFetch, user } = mount();
     await screen.findByText('Backend Squad');
+    await user.click(screen.getAllByTitle(/Show the users directly in this context/i)[0]);
+    expect(await within(tree()).findByTitle('Ada Lovelace — drag onto another team to move')).toBeInTheDocument();
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts/root-gen/members?limit=200');
 
-    // Several nodes have members → toggle the first (the root node).
-    const memberToggles = screen.getAllByTitle(/Show the users directly in this context/i);
-    await user.click(memberToggles[0]);
-
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    expect(authFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/contexts/root-gen/members'),
-    );
-    // The tree is the manager-hierarchy plugin's, so a member can be dragged
-    // to another team.
-    expect(screen.getByTitle('Ada Lovelace — drag onto another team to move')).toBeInTheDocument();
+    // The synced tree beside it, from another source: its members stay put.
+    await user.click(screen.getByRole('button', { name: 'Expand Sales OUs' }));
+    await screen.findByText('EMEA Sales');
+    const salesToggle = within(node('Sales OUs').closest('div')).getByTitle(/Show the users directly in this context/i);
+    await user.click(salesToggle);
+    await waitFor(() => expect(within(tree()).getAllByText('Ada Lovelace')).toHaveLength(2));
+    expect(within(tree()).getAllByTitle(/drag onto another team to move/)).toHaveLength(1);
   });
 
   it('enables member moves on the plugin that produced the tree, not on the type name', async () => {
-    // Same contextType as before, but produced by another plugin: the type
-    // no longer decides, the plugin does.
-    const otherPlugin = {
-      data: [{ ...roots.data[0], sourceAlgorithmName: 'department-tree', sourceAlgorithmDisplayName: 'Department tree' }],
-    };
-    const memberData = { total: 1, data: [{ id: 'u-1', displayName: 'Ada Lovelace', principalType: 'User' }] };
-    const authFetch = makeAuthFetch((url) => {
-      if (String(url).includes('/members')) return memberData;
-      if (String(url).includes('/api/contexts/tree')) return genSubtree;
-      if (String(url).includes('/api/contexts')) return otherPlugin;
-      return jsonResponse({}, { ok: false, status: 404 });
-    });
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-    const user = userEvent.setup();
-
+    const otherPlugin = { ...GEN, sourceAlgorithmName: 'department-tree', sourceAlgorithmDisplayName: 'Department tree' };
+    const { user } = mount({ roots: [otherPlugin] });
     await screen.findByText('Backend Squad');
     await user.click(screen.getAllByTitle(/Show the users directly in this context/i)[0]);
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    expect(screen.queryByTitle(/drag onto another team to move/)).not.toBeInTheDocument();
+    expect(await within(tree()).findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(within(tree()).queryByTitle(/drag onto another team to move/)).not.toBeInTheDocument();
   });
 
-  it('groups the trees by template and captions them with their source', async () => {
-    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch: routes() } });
+  it('renames a node in place and re-reads the tree', async () => {
+    const { authFetch, user } = mount({ answer: (u, opts) => (opts.method === 'PATCH' ? { ok: true } : undefined) });
+    await screen.findByText('Backend Squad');
+    await user.dblClick(node('Backend Squad'));
+    const input = await screen.findByRole('textbox', { name: 'Context name' });
+    await user.clear(input);
+    await user.type(input, 'Platform Squad{Enter}');
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts/child-backend', expect.objectContaining({
+      method: 'PATCH', body: JSON.stringify({ displayName: 'Platform Squad' }),
+    }));
+    await waitFor(() => expect(treeCalls(authFetch).filter(u => u.endsWith('root-gen'))).toHaveLength(2));
+  });
+
+  it('adds a child under a node, inheriting its target type', async () => {
+    const { authFetch, user } = mount({ answer: (u, opts) => (opts.method === 'POST' ? { id: 'new' } : undefined) });
+    await screen.findByText('Backend Squad');
+    const row = node('Backend Squad').closest('div');
+    await user.click(within(row).getByTitle('Add a child context'));
+    await user.type(await screen.findByRole('textbox', { name: 'New child name…' }), 'Interns{Enter}');
+    expect(authFetch).toHaveBeenCalledWith('/api/contexts', expect.objectContaining({ method: 'POST' }));
+    const body = JSON.parse(authFetch.mock.calls.find(([u, o]) => u === '/api/contexts' && o?.method === 'POST')[1].body);
+    expect(body).toEqual({ displayName: 'Interns', targetType: 'Identity', contextType: 'ManagerHierarchy', parentContextId: 'child-backend' });
+  });
+
+  it('shows the error when an edit is refused', async () => {
+    const { user } = mount({ answer: (u, opts) => (opts.method === 'PATCH' ? jsonResponse({ error: 'name taken' }, { ok: false, status: 409 }) : undefined) });
+    await screen.findByText('Backend Squad');
+    await user.dblClick(node('Frontend Squad'));
+    const input = await screen.findByRole('textbox', { name: 'Context name' });
+    await user.clear(input);
+    await user.type(input, 'Backend Squad{Enter}');
+    expect(await screen.findByText('name taken')).toBeInTheDocument();
+  });
+});
+
+describe('ContextsPage — list view, new tree, empty and error states', () => {
+  it('toggles to the list view, where a row selects the context in place', async () => {
+    const { onOpenDetail, user } = mount();
+    await screen.findByText('Backend Squad');
+    await user.click(screen.getByRole('button', { name: 'List' }));
+    expect(await screen.findByPlaceholderText('Filter by name…')).toBeInTheDocument();
+    expect(screen.getByText(/nodes$/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Frontend Squad' }));
+    await shownContext('Frontend Squad');
+    expect(onOpenDetail).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Tree' }));
+    expect(node('Frontend Squad')).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('opens the New Context wizard from the pane', async () => {
+    const { user } = mount();
     await screen.findByText('Sales OUs');
-    // Both roots are organisational units → one group heading, no raw
-    // "ManagerHierarchy (Identity)" style heading.
-    expect(screen.getByRole('tab', { name: /Organisation/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getAllByText('Organisation')).toHaveLength(2); // the tab and the selector's group heading
-    expect(screen.queryByText(/ManagerHierarchy \(Identity\)/)).not.toBeInTheDocument();
-    expect(screen.getByTitle('Generated by')).toHaveTextContent('Manager Hierarchy');
-    expect(screen.getByTitle('Scope system')).toHaveTextContent('Active Directory');
+    await user.click(screen.getByRole('button', { name: '+ New' }));
+    expect(await screen.findByText('New context tree')).toBeInTheDocument();
+  });
+
+  it('shows the roots-load error branch', async () => {
+    const authFetch = makeAuthFetch({ '/api/contexts': jsonResponse({ error: 'boom' }, { ok: false, status: 500 }) });
+    renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
+    expect(await screen.findByText('HTTP 500')).toBeInTheDocument();
+    expect(screen.getByText(/Select a tree on the left/i)).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no roots', async () => {
-    const authFetch = makeAuthFetch({
-      '/api/contexts/tree': genSubtree,
-      '/api/contexts': { data: [] },
-    });
-    const { container } = renderWithProviders(h(ContextsPage, {}), { auth: { authFetch } });
-
+    mount({ roots: [] });
     expect(await screen.findByText(/Select a tree on the left/i)).toBeInTheDocument();
-    // No root header rendered.
-    expect(within(container).queryByText('Delete tree…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delete tree…')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('context-detail-pane')).toBeNull();
   });
 });

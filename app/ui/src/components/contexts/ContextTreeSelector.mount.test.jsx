@@ -1,102 +1,100 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createElement as h } from 'react';
-import { renderWithProviders, makeAuthFetch, screen, within, fireEvent } from '@ui/test-utils/renderWithProviders';
+import { renderWithProviders, makeAuthFetch, screen, fireEvent } from '@ui/test-utils/renderWithProviders';
 import ContextTreeSelector from './ContextTreeSelector';
-import { rootCaption, groupRootsByCategory } from './ContextTreeSelector.helpers';
+import { rootCaption, rootSources, scopeSystems, filterRoots } from './ContextTreeSelector.helpers';
 
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
 
-// One root per template, plus one with no template, deliberately handed over
-// in the WRONG order so the grouping (not the input order) decides the layout.
 const roots = [
-  { id: 'seg', displayName: 'By location', variant: 'generated', targetType: 'Identity', contextCategory: 'Segment', sourceAlgorithmName: 'location-tree', sourceAlgorithmDisplayName: 'Location tree' },
-  { id: 'other', displayName: 'Legacy clusters', variant: 'generated', targetType: 'Identity', contextCategory: null, sourceAlgorithmName: 'kmeans' },
-  { id: 'app', displayName: 'Application catalogue', variant: 'synced', targetType: 'Resource', contextCategory: 'LogicalApplication', scopeSystemId: 7, scopeSystemName: 'ServiceNow' },
-  { id: 'tag', displayName: 'Tag catalogue', variant: 'manual', targetType: 'Resource', contextCategory: 'Tag' },
-  { id: 'org', displayName: 'Org chart', variant: 'generated', targetType: 'Identity', contextCategory: 'OrganizationalUnit', sourceAlgorithmName: 'manager-hierarchy', sourceAlgorithmDisplayName: 'Manager Hierarchy', directMemberCount: 3, totalMemberCount: 40 },
+  { id: 'seg', displayName: 'By location', variant: 'generated', targetType: 'Identity', sourceAlgorithmName: 'location-tree', sourceAlgorithmDisplayName: 'Location tree' },
+  { id: 'other', displayName: 'Legacy clusters', variant: 'generated', targetType: 'Identity', sourceAlgorithmName: 'kmeans' },
+  { id: 'app', displayName: 'Application catalogue', variant: 'synced', targetType: 'Resource', scopeSystemId: 7, scopeSystemName: 'ServiceNow' },
+  { id: 'tag', displayName: 'Tag catalogue', variant: 'manual', targetType: 'Resource' },
+  { id: 'hr', displayName: 'HR units', variant: 'synced', targetType: 'Identity', scopeSystemId: 3, scopeSystemName: 'Active Directory' },
 ];
+
+// The tree slot renders the roots it is handed, so a test sees what passed the filters.
+const renderTree = (list) => h('ul', { 'aria-label': 'tree' }, list.map(r => h('li', { key: r.id }, r.displayName)));
+const listed = () => [...screen.getByRole('list', { name: 'tree' }).querySelectorAll('li')].map(li => li.textContent);
 
 function mount(props = {}) {
   return renderWithProviders(
-    h(ContextTreeSelector, { roots, selectedRootId: 'org', onSelectRoot: vi.fn(), onOpenContext: vi.fn(), loading: false, ...props }),
+    h(ContextTreeSelector, { roots, renderTree, onOpenContext: vi.fn(), loading: false, ...props }),
     { auth: { authFetch: makeAuthFetch({}) } },
   );
 }
 
-// The group headings, in document order (the heading's own text, without the
-// "· n" count span).
-function headings() {
-  return screen.getAllByText(/^(Organisation|Applications|Tags|Segments|Other)$/).map(el => el.firstChild.textContent.trim());
-}
-
 describe('ContextTreeSelector helpers', () => {
   it('captions a generated root with its plugin and a synced root with its system', () => {
-    expect(rootCaption(roots[4])).toBe('Manager Hierarchy');
+    expect(rootCaption(roots[0])).toBe('Location tree');
     expect(rootCaption(roots[1])).toBe('kmeans'); // no display name → the plugin name
     expect(rootCaption(roots[2])).toBe('ServiceNow');
     expect(rootCaption(roots[3])).toBeNull();     // manual: nobody but the analyst
     expect(rootCaption({ variant: 'synced' })).toBeNull();
   });
 
-  it('groups by template in the fixed order and files null under Other', () => {
-    const groups = groupRootsByCategory(roots);
-    expect(groups.map(([label]) => label)).toEqual(['Organisation', 'Applications', 'Tags', 'Segments', 'Other']);
-    expect(groups[4][1].map(r => r.id)).toEqual(['other']);
+  it('joins the distinct sources in first-seen order, or null when none', () => {
+    expect(rootSources([roots[0], roots[2], roots[0], roots[3]])).toBe('Location tree · ServiceNow');
+    expect(rootSources([roots[3]])).toBeNull();
+    expect(rootSources(null)).toBeNull();
   });
 
-  it('leaves out a template nobody has a tree for', () => {
-    expect(groupRootsByCategory([roots[0], roots[0]]).map(([label, items]) => [label, items.length])).toEqual([['Segments', 2]]);
+  it('lists each scope system once, sorted by name', () => {
+    expect(scopeSystems([...roots, roots[2]])).toEqual([[3, 'Active Directory'], [7, 'ServiceNow']]);
+    expect(scopeSystems(null)).toEqual([]);
+  });
+
+  it('filters on target, variant and system together', () => {
+    const ids = (f) => filterRoots(roots, { target: '', variant: '', system: '', ...f }).map(r => r.id);
+    expect(ids({})).toEqual(['seg', 'other', 'app', 'tag', 'hr']);
+    expect(ids({ target: 'Resource' })).toEqual(['app', 'tag']);
+    expect(ids({ variant: 'synced' })).toEqual(['app', 'hr']);
+    expect(ids({ variant: 'synced', target: 'Identity' })).toEqual(['hr']);
+    expect(ids({ system: '7' })).toEqual(['app']);
+    expect(filterRoots(null, {})).toEqual([]);
   });
 });
 
 describe('ContextTreeSelector (mounted)', () => {
-  it('groups roots under their template heading, templates first and Other last', () => {
-    mount();
-    expect(headings()).toEqual(['Organisation', 'Applications', 'Tags', 'Segments', 'Other']);
-    // No heading is the old raw "contextType (targetType)" form.
-    expect(screen.queryByText(/\(Identity\)|\(Resource\)/)).toBeNull();
+  it('hands every root to the tree, under the pane title and a caption of sources', () => {
+    mount({ title: 'Organisation' });
+    expect(screen.getByText('Organisation')).toBeInTheDocument();
+    expect(listed()).toEqual(['By location', 'Legacy clusters', 'Application catalogue', 'Tag catalogue', 'HR units']);
+    expect(screen.getByTitle('Where these trees come from')).toHaveTextContent('Location tree · kmeans · ServiceNow · Active Directory');
   });
 
-  it('captions each root with its source and keeps the target badge', () => {
-    mount();
-    const org = screen.getByRole('button', { name: /Org chart/ });
-    expect(within(org).getByTitle('Generated by')).toHaveTextContent('Manager Hierarchy');
-    expect(within(org).getByText('Identity')).toBeInTheDocument();
-    expect(within(org).getByText('· 3/40')).toBeInTheDocument();
-
-    const app = screen.getByRole('button', { name: /Application catalogue/ });
-    expect(within(app).getByTitle('Scope system')).toHaveTextContent('ServiceNow');
-
-    // A manual tree carries no caption at all.
-    const tag = screen.getByRole('button', { name: /Tag catalogue/ });
-    expect(within(tag).queryByTitle(/Generated by|Scope system/)).toBeNull();
-  });
-
-  it('the filters still narrow the list, dropping empty groups', () => {
+  it('the filters narrow what the tree receives', () => {
     mount();
     fireEvent.change(screen.getByRole('combobox', { name: 'Filter by variant' }), { target: { value: 'synced' } });
-    expect(headings()).toEqual(['Applications']);
-    expect(screen.queryByText('Org chart')).toBeNull();
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by variant' }), { target: { value: '' } });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by target type' }), { target: { value: 'Resource' } });
-    expect(headings()).toEqual(['Applications', 'Tags']);
-
+    expect(listed()).toEqual(['Application catalogue', 'HR units']);
     fireEvent.change(screen.getByRole('combobox', { name: 'Filter by system' }), { target: { value: '7' } });
-    expect(headings()).toEqual(['Applications']);
+    expect(listed()).toEqual(['Application catalogue']);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by variant' }), { target: { value: '' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by system' }), { target: { value: '' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by target type' }), { target: { value: 'Resource' } });
+    expect(listed()).toEqual(['Application catalogue', 'Tag catalogue']);
   });
 
-  it('selects a root on click and marks the selected one', () => {
-    const onSelectRoot = vi.fn();
-    mount({ onSelectRoot });
-    expect(screen.getByRole('button', { name: /Org chart/ }).className).toMatch(/bg-blue-50/);
-    fireEvent.click(screen.getByRole('button', { name: /By location/ }));
-    expect(onSelectRoot).toHaveBeenCalledWith('seg');
-  });
-
-  it('says so when the filters match nothing', () => {
+  it('says so when the filters match nothing, and draws no tree', () => {
     mount({ roots: [] });
     expect(screen.getByText(/No trees match the current filters/)).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'tree' })).toBeNull();
+    // No roots scoped to a system → no system filter.
+    expect(screen.queryByRole('combobox', { name: 'Filter by system' })).toBeNull();
+  });
+
+  it('shows the loading line while roots load', () => {
+    mount({ roots: [], loading: true });
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByText(/No trees match/)).toBeNull();
+  });
+
+  it('opens the New wizard from "+ New"', () => {
+    const onNewTree = vi.fn();
+    mount({ onNewTree });
+    fireEvent.click(screen.getByRole('button', { name: '+ New' }));
+    expect(onNewTree).toHaveBeenCalled();
   });
 });

@@ -15,8 +15,13 @@ import useFeatures from '@ui/hooks/useFeatures';
 // Shows details for a single Context (v6 shape): header with variant /
 // target / scope-system / owner, paginated members, sub-contexts.
 // Loaded via /api/contexts/:id.
+//
+// `embedded`: rendered inside the Contexts page's right pane — no close
+// button (onClose then only runs after a delete), an "Open as page" button
+// (onOpenAsPage(attrs)) instead. `refreshKey` re-reads the context when the
+// tree beside it changed it; `onEdited` tells the page an edit here did.
 
-export default function ContextDetailPage({ contextId, cachedData, onCacheData, onClose, onOpenDetail }) {
+export default function ContextDetailPage({ contextId, onCacheData, onClose, onOpenDetail, embedded = false, onOpenAsPage, refreshKey, onEdited }) {
   const { authFetch } = useAuth();
   const features = useFeatures();
   // loading/error are flipped synchronously inside the fetch effects; reducer
@@ -65,7 +70,7 @@ export default function ContextDetailPage({ contextId, cachedData, onCacheData, 
       .finally(() => setLoading(false));
   }, [authFetch, contextId, onCacheData]);
 
-  useEffect(() => { fetchDetail(); }, [fetchDetail]);
+  useEffect(() => { fetchDetail(); }, [fetchDetail, refreshKey]);
 
   // ─── Fetch paginated members ──────────────────────────────────────
   const fetchMembers = useCallback(() => {
@@ -87,7 +92,7 @@ export default function ContextDetailPage({ contextId, cachedData, onCacheData, 
       .finally(() => setMembersLoading(false));
   }, [authFetch, contextId, memberPage, memberSearch, includeDescendants]);
 
-  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+  useEffect(() => { fetchMembers(); }, [fetchMembers, refreshKey]);
 
   // Reset page when search / scope changes — during render via a composite
   // compare, so no synchronous setState lives in an effect.
@@ -105,34 +110,10 @@ export default function ContextDetailPage({ contextId, cachedData, onCacheData, 
 
   // ─── Render ────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 dark:text-gray-400">Loading context details...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-6 max-w-md mx-auto mt-12">
-        <h2 className="text-red-800 dark:text-red-300 font-semibold text-lg">Failed to load context</h2>
-        <p className="text-red-600 dark:text-red-400 mt-2 text-sm">{error}</p>
-        <div className="flex gap-3 mt-3">
-          <button onClick={fetchDetail} className="text-sm text-red-700 dark:text-red-400 underline hover:text-red-900">Retry</button>
-          <button onClick={onClose} className="text-sm text-gray-500 dark:text-gray-400 underline hover:text-gray-700 dark:hover:text-gray-300">Close</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!detail || !detail.attributes) {
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center text-gray-600 dark:text-gray-500 text-sm">
-        Context not found.
-        <button onClick={onClose} className="ml-2 text-blue-500 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300">Close</button>
-      </div>
-    );
+  // Embedded, the page has no Close of its own: the pane beside it selects.
+  const close = embedded ? undefined : onClose;
+  if (loading || error || !detail?.attributes) {
+    return <DetailStatus loading={loading} error={error} onRetry={fetchDetail} onClose={close} />;
   }
 
   const subContexts = detail.subContexts || [];
@@ -143,82 +124,132 @@ export default function ContextDetailPage({ contextId, cachedData, onCacheData, 
   // would overwrite the analyst edit on the next crawl.
   const canEditMembers = isManual || isGenerated;
 
-  // Organisational units and applications show their template's facts and
-  // workflows first; tags, segments and the rest keep the generic page.
-  const profile = profileFor(detail.attributes.contextCategory);
+  const tabs = detailTabs(features.riskScoring && riskData?.riskScore != null, memberTotal);
 
-  const hasRisk = features.riskScoring && riskData && riskData.riskScore != null;
-  const tabs = [
+  // One render function per tab; only the active one runs.
+  const panels = {
+    attributes: () => (
+      <ContextAttributesTab
+        contextId={contextId}
+        attrs={detail.attributes}
+        isManual={isManual}
+        isGenerated={isGenerated}
+        authFetch={authFetch}
+        onUpdated={() => { fetchDetail(); onEdited?.(); }}
+        onDeleted={() => onClose?.()}
+      />
+    ),
+
+    relationships: () => (
+      <ContextRelationshipsTab
+        subContexts={subContexts}
+        contextId={contextId}
+        attrs={detail.attributes}
+        canEditMembers={canEditMembers}
+        isGenerated={isGenerated}
+        includeDescendants={includeDescendants}
+        onIncludeDescendantsChange={setIncludeDescendants}
+        memberSearch={memberSearch}
+        onMemberSearchChange={setMemberSearch}
+        members={members}
+        memberTotal={memberTotal}
+        membersLoading={membersLoading}
+        memberPage={memberPage}
+        onMemberPageChange={setMemberPage}
+        pageSize={PAGE_SIZE}
+        authFetch={authFetch}
+        onMembersChanged={() => { fetchMembers(); fetchDetail(); onEdited?.(); }}
+        onOpenDetail={onOpenDetail}
+      />
+    ),
+
+    timeline: () => (
+      <EntityTimeline
+        events={timeline.events}
+        loading={timeline.loading}
+        sinceDays={timelineDays}
+        onSinceDaysChange={setTimelineDays}
+        onOpenDetail={onOpenDetail}
+      />
+    ),
+
+    risk: () => riskData && <RiskScoreSection attributes={riskData} entityType="contexts" entityId={contextId} authFetch={authFetch} />,
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-4">
+      <DetailTop
+        contextId={contextId}
+        attrs={detail.attributes}
+        subContexts={subContexts}
+        onClose={close}
+        onOpenAsPage={embedded ? () => onOpenAsPage?.(detail.attributes) : undefined}
+        onOpenDetail={onOpenDetail}
+      />
+
+      <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} />
+
+      <div className="mt-4 space-y-4">
+        {panels[activeTab]?.()}
+      </div>
+    </div>
+  );
+}
+
+// The page while it cannot show a context: loading, failed (with Retry), or
+// not found. Close only where the page has one (not when embedded).
+function DetailStatus({ loading, error, onRetry, onClose }) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500 dark:text-gray-400">Loading context details...</div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-6 max-w-md mx-auto mt-12">
+        <h2 className="text-red-800 dark:text-red-300 font-semibold text-lg">Failed to load context</h2>
+        <p className="text-red-600 dark:text-red-400 mt-2 text-sm">{error}</p>
+        <div className="flex gap-3 mt-3">
+          <button onClick={onRetry} className="text-sm text-red-700 dark:text-red-400 underline hover:text-red-900">Retry</button>
+          {onClose && <button onClick={onClose} className="text-sm text-gray-500 dark:text-gray-400 underline hover:text-gray-700 dark:hover:text-gray-300">Close</button>}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center text-gray-600 dark:text-gray-500 text-sm">
+      Context not found.
+      {onClose && <button onClick={onClose} className="ml-2 text-blue-500 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300">Close</button>}
+    </div>
+  );
+}
+
+// The tabs under the profile; Risk only when risk scoring has a score for it.
+function detailTabs(hasRisk, memberTotal) {
+  return [
     { key: 'attributes', label: 'Attributes' },
     { key: 'relationships', label: 'Relationships', count: memberTotal },
     { key: 'timeline', label: 'Timeline' },
     hasRisk && { key: 'risk', label: 'Risk' },
   ];
+}
 
+// Header, description and — for organisational units and applications — the
+// template's profile (facts, variants, workflows). Tags, segments and the
+// rest keep the generic page.
+function DetailTop({ contextId, attrs, subContexts, onClose, onOpenAsPage, onOpenDetail }) {
+  const profile = profileFor(attrs.contextCategory);
   return (
-    <div className="max-w-7xl mx-auto space-y-4">
-      {/* Header */}
-      <ContextDetailHeader attrs={detail.attributes} onClose={onClose} onOpenDetail={onOpenDetail} />
-      {detail.attributes.description && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{detail.attributes.description}</div>
+    <>
+      <ContextDetailHeader attrs={attrs} onClose={onClose} onOpenAsPage={onOpenAsPage} onOpenDetail={onOpenDetail} />
+      {attrs.description && (
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{attrs.description}</div>
       )}
-
       {profile && (
-        <ContextProfile key={contextId} profile={profile} attrs={detail.attributes} subContexts={subContexts} onOpenDetail={onOpenDetail} />
+        <ContextProfile key={contextId} profile={profile} attrs={attrs} subContexts={subContexts} onOpenDetail={onOpenDetail} />
       )}
-
-      <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} />
-
-      <div className="mt-4 space-y-4">
-        {activeTab === 'attributes' && (
-          <ContextAttributesTab
-            contextId={contextId}
-            attrs={detail.attributes}
-            isManual={isManual}
-            isGenerated={isGenerated}
-            authFetch={authFetch}
-            onUpdated={() => fetchDetail()}
-            onDeleted={() => onClose?.()}
-          />
-        )}
-
-        {activeTab === 'relationships' && (
-          <ContextRelationshipsTab
-            subContexts={subContexts}
-            contextId={contextId}
-            attrs={detail.attributes}
-            canEditMembers={canEditMembers}
-            isGenerated={isGenerated}
-            includeDescendants={includeDescendants}
-            onIncludeDescendantsChange={setIncludeDescendants}
-            memberSearch={memberSearch}
-            onMemberSearchChange={setMemberSearch}
-            members={members}
-            memberTotal={memberTotal}
-            membersLoading={membersLoading}
-            memberPage={memberPage}
-            onMemberPageChange={setMemberPage}
-            pageSize={PAGE_SIZE}
-            authFetch={authFetch}
-            onMembersChanged={() => { fetchMembers(); fetchDetail(); }}
-            onOpenDetail={onOpenDetail}
-          />
-        )}
-
-        {activeTab === 'timeline' && (
-          <EntityTimeline
-            events={timeline.events}
-            loading={timeline.loading}
-            sinceDays={timelineDays}
-            onSinceDaysChange={setTimelineDays}
-            onOpenDetail={onOpenDetail}
-          />
-        )}
-
-        {activeTab === 'risk' && riskData && (
-          <RiskScoreSection attributes={riskData} entityType="contexts" entityId={contextId} authFetch={authFetch} />
-        )}
-      </div>
-    </div>
+    </>
   );
 }

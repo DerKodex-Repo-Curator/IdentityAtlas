@@ -67,7 +67,7 @@ describe('ContextTreeSelector search', () => {
   it('swaps the tree list for search results while a term is typed, and back', async () => {
     const af = makeAuthFetch({ '/api/contexts?': { data: [PAYROLL] } });
     renderWithProviders(
-      <ContextTreeSelector roots={roots} selectedRootId="r1" onSelectRoot={() => {}} onOpenContext={() => {}} loading={false} />,
+      <ContextTreeSelector roots={roots} renderTree={(list) => list.map(r => <span key={r.id}>{r.displayName}</span>)} onOpenContext={() => {}} loading={false} />,
       { auth: { authFetch: af } },
     );
     expect(screen.getByText('Application catalogue')).toBeInTheDocument();

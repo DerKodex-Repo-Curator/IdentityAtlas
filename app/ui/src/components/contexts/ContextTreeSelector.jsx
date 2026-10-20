@@ -1,63 +1,37 @@
 ﻿import { useMemo, useState } from 'react';
-import { variantMeta, targetTypeMeta } from '@ui/utils/contextStyles';
 import { useDebouncedValue } from '@ui/hooks/useDebouncedValue';
 import usePersistedState from '@ui/hooks/usePersistedState';
 import ExtendedSearchToggle from '@ui/components/ExtendedSearchToggle';
 import ContextSearchResults from './ContextSearchResults';
-import { rootCaption, groupRootsByCategory } from './ContextTreeSelector.helpers';
+import { filterRoots, rootSources, scopeSystems } from './ContextTreeSelector.helpers';
 
-function renderMemberCounts(n) {
-  const d = typeof n.directMemberCount === 'number' ? n.directMemberCount : null;
-  const t = typeof n.totalMemberCount  === 'number' ? n.totalMemberCount  : null;
-  if (d == null && t == null) return null;
-  if (t != null && d != null && t > d) {
-    return <span className="text-[10px] text-gray-600 dark:text-gray-500">· {d}/{t}</span>;
-  }
-  return <span className="text-[10px] text-gray-600 dark:text-gray-500">· {d ?? t}</span>;
-}
+// Left pane of the Contexts tab: the title, "+ New", a search over every
+// level, and the target / variant / system filters — around the tree itself.
+// The tree is the page's: `renderTree(filteredRoots)` draws the roots that pass
+// the filters as the top level of one navigable tree. A caption names where
+// those trees come from (their plugins and systems).
 
-// Left pane of the Contexts tab. Lists every root context, grouped by
-// template so every organisation tree sits together, every application tree,
-// and so on. Within a group, each entry shows variant colour + target badge +
-// a caption naming its source (plugin or system).
-//
-// Filter bar on top: target type, variant, system. Useful when there are
-// dozens of trees.
-
-export default function ContextTreeSelector({ roots, selectedRootId, onSelectRoot, onNewTree, onOpenContext, loading }) {
+export default function ContextTreeSelector({ title = 'Trees', roots, renderTree, onNewTree, onOpenContext, loading }) {
   const [filterTarget, setFilterTarget] = useState('');
   const [filterVariant, setFilterVariant] = useState('');
   const [filterSystem, setFilterSystem] = useState('');
-  // Typing a search swaps the tree list for matches from every level.
+  // Typing a search swaps the tree for matches from every level.
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 400);
   const [extendedSearch, setExtendedSearch] = usePersistedState('iatlas.list.context.extendedSearch', false);
   const searching = debouncedSearch.trim() !== '';
 
-  const systems = useMemo(() => {
-    const seen = new Map();
-    for (const r of roots) {
-      if (r.scopeSystemId && r.scopeSystemName && !seen.has(r.scopeSystemId)) {
-        seen.set(r.scopeSystemId, r.scopeSystemName);
-      }
-    }
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [roots]);
-
-  const filtered = useMemo(() => {
-    return roots.filter(r =>
-      (!filterTarget  || r.targetType === filterTarget) &&
-      (!filterVariant || r.variant    === filterVariant) &&
-      (!filterSystem  || String(r.scopeSystemId) === filterSystem)
-    );
-  }, [roots, filterTarget, filterVariant, filterSystem]);
-
-  const groups = useMemo(() => groupRootsByCategory(filtered), [filtered]);
+  const systems = useMemo(() => scopeSystems(roots), [roots]);
+  const filtered = useMemo(
+    () => filterRoots(roots, { target: filterTarget, variant: filterVariant, system: filterSystem }),
+    [roots, filterTarget, filterVariant, filterSystem],
+  );
+  const sources = rootSources(filtered);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+    <div data-testid="context-tree-pane" className="flex flex-col h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
       <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">Trees</div>
+        <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</div>
         {onNewTree && (
           <button
             onClick={onNewTree}
@@ -106,52 +80,18 @@ export default function ContextTreeSelector({ roots, selectedRootId, onSelectRoo
           <ContextSearchResults term={debouncedSearch} extended={extendedSearch} onOpenContext={onOpenContext} />
         </div>
       ) : (
-      <div className="flex-1 overflow-auto">
-        {loading && <div className="p-3 text-xs text-gray-500 dark:text-gray-400">Loading…</div>}
-        {!loading && filtered.length === 0 && (
-          <div className="p-3 text-xs text-gray-500 dark:text-gray-400">
-            No trees match the current filters. Contexts arrive from a crawler (synced), from a plugin run (generated), or from the "+ New" button (manual).
-          </div>
-        )}
-        {groups.map(([group, items]) => (
-          <div key={group} className="mb-2">
-            <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 border-y border-gray-100 dark:border-gray-700">
-              {group} <span className="text-gray-600 dark:text-gray-500">· {items.length}</span>
+        <div className="flex-1 overflow-auto">
+          {loading && <div className="p-3 text-xs text-gray-500 dark:text-gray-400">Loading…</div>}
+          {!loading && filtered.length === 0 && (
+            <div className="p-3 text-xs text-gray-500 dark:text-gray-400">
+              No trees match the current filters. Contexts arrive from a crawler (synced), from a plugin run (generated), or from the "+ New" button (manual).
             </div>
-            <ul>
-              {items.map(n => {
-                const v = variantMeta(n.variant);
-                const t = targetTypeMeta(n.targetType);
-                const caption = rootCaption(n);
-                const selected = n.id === selectedRootId;
-                return (
-                  <li key={n.id}>
-                    <button
-                      onClick={() => onSelectRoot(n.id)}
-                      className={`w-full text-left px-3 py-2 text-xs border-l-4 ${v.borderClass} hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 dark:text-white truncate">{n.displayName}</div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border ${t.badgeClass}`}>{t.label}</span>
-                            {caption && (
-                              <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-400 border border-slate-200 dark:border-gray-600" title={n.variant === 'synced' ? 'Scope system' : 'Generated by'}>
-                                {caption}
-                              </span>
-                            )}
-                            {renderMemberCounts(n)}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
+          )}
+          {sources && (
+            <div className="px-3 pt-2 text-[11px] text-gray-600 dark:text-gray-400" title="Where these trees come from">{sources}</div>
+          )}
+          {filtered.length > 0 && renderTree?.(filtered)}
+        </div>
       )}
     </div>
   );

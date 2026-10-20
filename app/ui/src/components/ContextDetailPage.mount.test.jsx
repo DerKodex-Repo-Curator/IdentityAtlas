@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createElement as h } from 'react';
+import { createElement as h, useState } from 'react';
 import ContextDetailPage from './ContextDetailPage';
 import {
   renderWithProviders,
@@ -351,5 +351,63 @@ describe('ContextDetailPage (mounted)', () => {
 
     await screen.findByText('Engineering Cluster');
     expect(onCacheData).toHaveBeenCalledWith('ctx-1', 'context', generatedDetail);
+  });
+});
+
+describe('ContextDetailPage — embedded in the Contexts page', () => {
+  it('has no close button but an "Open as page" button that hands over the context', async () => {
+    const onOpenAsPage = vi.fn();
+    const onClose = vi.fn();
+    renderWithProviders(
+      h(ContextDetailPage, { ...baseProps, embedded: true, onOpenAsPage, onClose }),
+      { auth: { authFetch: routes() } },
+    );
+    await screen.findByText('Engineering Cluster');
+    expect(screen.queryByTitle('Close')).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open as page' }));
+    expect(onOpenAsPage).toHaveBeenCalledWith(expect.objectContaining({ id: 'ctx-1', displayName: 'Engineering Cluster' }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('as a page keeps its close button and offers no "Open as page"', async () => {
+    const onClose = vi.fn();
+    renderWithProviders(h(ContextDetailPage, { ...baseProps, onClose, onOpenAsPage: vi.fn() }), { auth: { authFetch: routes() } });
+    await screen.findByText('Engineering Cluster');
+    expect(screen.queryByRole('button', { name: 'Open as page' })).toBeNull();
+    await userEvent.setup().click(screen.getByTitle('Close'));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows "Context not found" without a Close link when embedded, with one as a page', async () => {
+    const authFetch = routes({ '/api/contexts/ctx-1': { attributes: null } });
+    const { unmount } = renderWithProviders(h(ContextDetailPage, { ...baseProps, embedded: true }), { auth: { authFetch } });
+    expect(await screen.findByText(/Context not found/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    unmount();
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+    expect(await screen.findByText(/Context not found/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('re-reads the context and its members when refreshKey changes', async () => {
+    const authFetch = routes();
+    const onEdited = vi.fn();
+    // The page around it bumps refreshKey after a tree edit.
+    function Harness() {
+      const [key, setKey] = useState(0);
+      return h('div', null,
+        h('button', { onClick: () => setKey(k => k + 1) }, 'bump'),
+        h(ContextDetailPage, { ...baseProps, embedded: true, refreshKey: key, onEdited }));
+    }
+    renderWithProviders(h(Harness), { auth: { authFetch } });
+    await screen.findByText('Engineering Cluster');
+    const detailReads = () => authFetch.mock.calls.filter(([u]) => u === '/api/contexts/ctx-1').length;
+    const memberReads = () => authFetch.mock.calls.filter(([u]) => String(u).startsWith('/api/contexts/ctx-1/members')).length;
+    const [detailBefore, membersBefore] = [detailReads(), memberReads()];
+    fireEvent.click(screen.getByRole('button', { name: 'bump' }));
+    await waitFor(() => expect(detailReads()).toBe(detailBefore + 1));
+    expect(memberReads()).toBe(membersBefore + 1);
+    expect(await screen.findByText('Engineering Cluster')).toBeInTheDocument();
+    expect(onEdited).not.toHaveBeenCalled(); // a refresh from outside is not an edit here
   });
 });

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../db/connection.js');
 import { query, queryOne } from '../db/connection.js';
-import { pickCandidate, suggestAccountable, SIGNALS, SUGGESTION_THRESHOLD } from './roleSuggestion.js';
+import { pickCandidate, share, suggestAccountable, SIGNALS, SUGGESTION_THRESHOLD } from './roleSuggestion.js';
 import { OWNERSHIP_RESOURCE_TYPES, OWNERSHIP_RELATIONSHIP_TYPES } from '../lib/ownershipTypes.js';
 
 const CTX = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -125,8 +125,26 @@ describe('suggestAccountable', () => {
     queryOne.mockResolvedValueOnce({ total: 6 });
     query.mockResolvedValueOnce({ rows: [{ id: P1, displayName: 'Owner', count: 4 }] });
     const s = await suggestAccountable({ id: CTX, targetType: 'Resource' });
-    expect(s).toMatchObject({ principalId: P1, reason: 'owner of 4 of its 6 resources', count: 4, total: 6 });
+    expect(s).toMatchObject({ principalId: P1, reason: 'owner of 4 of the 6 resources', count: 4, total: 6 });
     expect(query.mock.calls[0][0]).toBe(SIGNALS.Resource.sql);
+  });
+
+  it('a unit of one member says "the only member", not "1 of the 1"', async () => {
+    queryOne.mockResolvedValueOnce({ total: 1 });
+    query.mockResolvedValueOnce({ rows: [{ id: P1, displayName: 'Manager', count: 1 }] });
+    const s = await suggestAccountable({ id: CTX, targetType: 'Principal' });
+    expect(s.reason).toBe('manager of the only member');
+  });
+});
+
+describe('share', () => {
+  it.each([
+    [1, 1, 'member', 'the only member'],
+    [3, 3, 'resource', 'all 3 resources'],
+    [3, 4, 'member', '3 of the 4 members'],
+    [1, 2, 'resource', '1 of the 2 resources'],
+  ])('%i of %i %s → %s', (count, total, noun, expected) => {
+    expect(share(count, total, noun)).toBe(expected);
   });
 
   it('null below the threshold', async () => {

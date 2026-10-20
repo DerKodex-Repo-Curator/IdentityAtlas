@@ -7,7 +7,9 @@ import ContextAccessCounts from './contexts/ContextAccessCounts';
 // ─── Header — surfaces provenance (template, variant, target, system, owner)
 // The people answering for a unit or application sit in its profile
 // (contexts/profiles/), right below this header.
-export default function ContextDetailHeader({ attrs, onClose, onOpenDetail }) {
+// Embedded in the Contexts page the header has no close button (onClose is
+// left out) and offers "Open as page" (onOpenAsPage) instead.
+export default function ContextDetailHeader({ attrs, onClose, onOpenDetail, onOpenAsPage }) {
   const canEditRecipe = useCanBuildContexts() && isRecipeRoot(attrs) && !!onOpenDetail;
   const v = variantMeta(attrs.variant);
   const t = targetTypeMeta(attrs.targetType);
@@ -51,11 +53,20 @@ export default function ContextDetailHeader({ attrs, onClose, onOpenDetail }) {
             Edit search terms
           </button>
         )}
-        <button onClick={onClose} className="text-gray-600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 p-1" title="Close">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        {onOpenAsPage && (
+          <button type="button" onClick={onOpenAsPage}
+            className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 whitespace-nowrap"
+            title="Open this context in its own tab">
+            Open as page
+          </button>
+        )}
+        {onClose && (
+          <button onClick={onClose} className="text-gray-600 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 p-1" title="Close">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
         </div>
       </div>
     </div>
