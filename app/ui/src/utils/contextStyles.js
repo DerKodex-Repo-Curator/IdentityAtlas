@@ -51,6 +51,16 @@ export const CATEGORY_META = {
 // Grouping order in the tree selector: the four templates, then Other.
 export const CATEGORY_ORDER = ['OrganizationalUnit', 'LogicalApplication', 'Tag', 'Segment', 'Other'];
 
+// The kind of member a context holds, in the words the template screens use:
+// people (identities), accounts (principals), resources. A unit exists as one
+// context per kind, so these are also the variants of a unit, in this order.
+export const MEMBER_KINDS = ['Identity', 'Principal', 'Resource'];
+const MEMBER_KIND_LABELS = { Identity: 'People', Principal: 'Accounts', Resource: 'Resources', System: 'Systems' };
+
+export function memberKindLabel(targetType) {
+  return MEMBER_KIND_LABELS[targetType] || 'Members';
+}
+
 const OTHER_CATEGORY_META = {
   label: 'Other', groupLabel: 'Other',
   description: 'No template: the context type is not one of the four templates.',

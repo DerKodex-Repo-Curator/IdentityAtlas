@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '@ui/auth/AuthGate';
 import { useFetch } from '@ui/hooks/useFetch';
 import { useDebouncedValue } from '@ui/hooks/useDebouncedValue';
 import { useHasPermission } from '@ui/auth/usePermissions';
+import ContextBestGuess from './ContextBestGuess';
 
 // ─── The people who answer for a context ─────────────────────────────────
 // An organizational unit and a logical application carry roles: one
@@ -13,15 +14,23 @@ import { useHasPermission } from '@ui/auth/usePermissions';
 // add one (search /api/users, PUT the chosen account with the chosen role)
 // or remove one (DELETE). Roles a plugin or a sync wrote are shown the same
 // way — removing one is the analyst's call, the API keeps the provenance.
+//
+// The template profiles pass their own vocabulary (an application's
+// Accountable is its Owner), drop the heading when they draw their own, and
+// turn on `suggest`: with no Accountable set, the Accountable fact then shows
+// the API's best guess with Confirm / Reject / Choose someone else.
 
 const ROLED_CATEGORIES = new Set(['OrganizationalUnit', 'LogicalApplication']);
 
-export default function ContextPeople({ attrs, onOpenDetail }) {
+export default function ContextPeople({ attrs, onOpenDetail, heading = 'People', accountableLabel = 'Accountable', suggest = false }) {
   const { authFetch } = useAuth();
   const canWrite = useHasPermission('data.write.contexts');
   const enabled = ROLED_CATEGORIES.has(attrs?.contextCategory);
-  const { data: roles, error, reload } = useFetch(`/api/contexts/${attrs?.id}/roles`, { authFetch, enabled, initialData: [] });
+  const { data: roles, loading, error, reload } = useFetch(`/api/contexts/${attrs?.id}/roles`, { authFetch, enabled, initialData: [] });
   const [actionError, setActionError] = useState(null);
+  // The picker's role lives here so "Choose someone else" can point it at Accountable.
+  const [pickRole, setPickRole] = useState('Responsible');
+  const pickerInput = useRef(null);
 
   if (!enabled) return null;
 
@@ -37,13 +46,15 @@ export default function ContextPeople({ attrs, onOpenDetail }) {
     } catch (e) { setActionError(e.message || 'Remove failed'); }
   }
 
-  async function add(role, principalId) {
+  // holder = { principalId } or { identityId }: the picker adds accounts, a
+  // best guess may name either.
+  async function add(role, holder) {
     setActionError(null);
     try {
       const r = await authFetch(`/api/contexts/${attrs.id}/roles`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, principalId }),
+        body: JSON.stringify({ role, ...holder }),
       });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
@@ -53,6 +64,11 @@ export default function ContextPeople({ attrs, onOpenDetail }) {
     } catch (e) { setActionError(e.message || 'Add failed'); }
   }
 
+  function chooseSomeoneElse() {
+    setPickRole('Accountable');
+    pickerInput.current?.focus();
+  }
+
   const list = Array.isArray(roles) ? roles : [];
   const accountable = list.filter(r => r.role === 'Accountable');
   const responsible = list.filter(r => r.role === 'Responsible');
@@ -60,11 +76,16 @@ export default function ContextPeople({ attrs, onOpenDetail }) {
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700" data-testid="context-people">
-      <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">People</div>
+      {heading && <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{heading}</div>}
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-gray-500 dark:text-gray-400">Accountable</dt>
+        <dt className="text-gray-500 dark:text-gray-400">{accountableLabel}</dt>
         <dd className="flex flex-wrap items-center gap-1">
           {accountable.length === 0 && <span className="text-gray-600 dark:text-gray-500">not set</span>}
+          {/* Only once the roles have loaded: before that "no Accountable" is not known. */}
+          {accountable.length === 0 && suggest && !loading && !error && (
+            <ContextBestGuess contextId={attrs.id} canWrite={canWrite}
+              onConfirm={holder => add('Accountable', holder)} onChooseOther={chooseSomeoneElse} />
+          )}
           {accountable.map(r => <RoleChip key={r.id} role={r} canWrite={canWrite} onRemove={remove} onOpenDetail={onOpenDetail} />)}
         </dd>
         <dt className="text-gray-500 dark:text-gray-400">Responsible</dt>
@@ -73,7 +94,7 @@ export default function ContextPeople({ attrs, onOpenDetail }) {
           {responsible.map(r => <RoleChip key={r.id} role={r} canWrite={canWrite} onRemove={remove} onOpenDetail={onOpenDetail} />)}
         </dd>
       </dl>
-      {canWrite && <AddRole onAdd={add} />}
+      {canWrite && <AddRole onAdd={add} accountableLabel={accountableLabel} role={pickRole} onRoleChange={setPickRole} inputRef={pickerInput} />}
       {message && (
         <div role="alert" className="mt-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-2 py-1">{message}</div>
       )}
@@ -101,9 +122,8 @@ function RoleChip({ role, canWrite, onRemove, onOpenDetail }) {
 
 // Search accounts and attach one with the chosen role. The search is
 // debounced; the list closes once a person is added.
-function AddRole({ onAdd }) {
+function AddRole({ onAdd, accountableLabel, role, onRoleChange, inputRef }) {
   const { authFetch } = useAuth();
-  const [role, setRole] = useState('Responsible');
   const [query, setQuery] = useState('');
   const term = useDebouncedValue(query.trim(), 250);
   const { data: hits } = useFetch(
@@ -113,18 +133,19 @@ function AddRole({ onAdd }) {
   const results = term === '' ? [] : hits;
 
   async function pick(p) {
-    await onAdd(role, p.id);
+    await onAdd(role, { principalId: p.id });
     setQuery('');
   }
 
   return (
     <div className="mt-2 flex items-start gap-2">
-      <select aria-label="Role to add" value={role} onChange={e => setRole(e.target.value)} className="border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600">
-        <option value="Accountable">Accountable</option>
+      <select aria-label="Role to add" value={role} onChange={e => onRoleChange(e.target.value)} className="border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600">
+        <option value="Accountable">{accountableLabel}</option>
         <option value="Responsible">Responsible</option>
       </select>
       <div className="relative flex-1 max-w-xs">
         <input
+          ref={inputRef}
           value={query}
           onChange={e => setQuery(e.target.value)}
           aria-label="Add a person"

@@ -150,6 +150,25 @@ describe('ContextDetailPage — the template in the header', () => {
     expect(authFetch).not.toHaveBeenCalledWith(expect.stringContaining('/roles'));
   });
 
+  it('keeps the generic page for a tag or segment: no profile, no variants, no workflows', async () => {
+    for (const contextCategory of ['Tag', 'Segment']) {
+      const authFetch = routes({ '/api/contexts/ctx-1': { ...generatedDetail, attributes: { ...generatedDetail.attributes, contextCategory } } });
+      const { unmount } = renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+      expect(await screen.findByText('Engineering Cluster')).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: /^About this/ })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Workflows' })).toBeNull();
+      expect(authFetch).not.toHaveBeenCalledWith(expect.stringContaining('/relationships'));
+      unmount();
+    }
+  });
+
+  it('gives an application its own profile and the download card', async () => {
+    const authFetch = routes({ '/api/contexts/ctx-1': { ...generatedDetail, attributes: { ...generatedDetail.attributes, contextCategory: 'LogicalApplication', targetType: 'Resource' } } });
+    renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
+    expect(await screen.findByRole('region', { name: 'About this application' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download report' })).toBeInTheDocument();
+  });
+
   it('badges an organisational unit and lists the people answering for it', async () => {
     // The roles key must sit before the bare detail key (substring match), so
     // it cannot go through routes()' overrides spread.
@@ -163,7 +182,8 @@ describe('ContextDetailPage — the template in the header', () => {
     renderWithProviders(h(ContextDetailPage, baseProps), { auth: { authFetch } });
     expect(await screen.findByText('Organisation')).toBeInTheDocument();
     expect(await screen.findByText('Mara Lindqvist')).toBeInTheDocument();
-    expect(screen.getByText('People')).toBeInTheDocument();
+    // The people sit in the unit's profile, under its own heading.
+    expect(screen.getByRole('region', { name: 'About this unit' })).toHaveTextContent('Mara Lindqvist');
   });
 });
 

@@ -3,10 +3,10 @@ import { useCanBuildContexts } from '@ui/hooks/useCanBuildContexts';
 import { isRecipeRoot } from './contexts/assistant/recipeDraft';
 import ContextOwner from './contexts/ContextOwner';
 import ContextAccessCounts from './contexts/ContextAccessCounts';
-import ContextPeople from './contexts/ContextPeople';
 
 // ─── Header — surfaces provenance (template, variant, target, system, owner)
-// and, for an organisational unit or application, the people answering for it.
+// The people answering for a unit or application sit in its profile
+// (contexts/profiles/), right below this header.
 export default function ContextDetailHeader({ attrs, onClose, onOpenDetail }) {
   const canEditRecipe = useCanBuildContexts() && isRecipeRoot(attrs) && !!onOpenDetail;
   const v = variantMeta(attrs.variant);
@@ -43,7 +43,6 @@ export default function ContextDetailHeader({ attrs, onClose, onOpenDetail }) {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Parent: {attrs.parentDisplayName}</p>
           )}
           <ContextAccessCounts attrs={attrs} />
-          <ContextPeople attrs={attrs} onOpenDetail={onOpenDetail} />
         </div>
         <div className="flex items-start gap-2">
         {canEditRecipe && (

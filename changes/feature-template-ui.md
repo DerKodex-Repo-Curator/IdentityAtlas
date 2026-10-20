@@ -1,0 +1,4 @@
+- Contexts now has a tab per template (Organisation, Applications, Tags, Segments), with counts; Organisation switches between People, Accounts and Resources trees, so each tree holds one kind of member
+- Organisational units and applications open with their key facts: who is accountable (the owner, for an application) and responsible, members, sub-units, and the unit's variants ("Contoso · People 12 · Accounts 15 · Resources 31"), each opening its own context
+- When nobody is accountable, the page suggests someone and says why — the manager of most of the unit's people or accounts, or the owner of most of its resources — with Confirm, Reject (never suggested again for that unit) and Choose someone else
+- A unit or application can download its Entitlement Pivot report straight from its page; a people or accounts unit uses its resources variant, or offers the matrix scoped to the unit when it has none

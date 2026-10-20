@@ -9,6 +9,8 @@ import ContextTreeView from './contexts/ContextTreeView';
 import ContextListView from './contexts/ContextListView';
 import NewContextWizard from './contexts/NewContextWizard';
 import ContextOwner from './contexts/ContextOwner';
+import TemplateTabs from './contexts/TemplateTabs';
+import { templateTabs, kindOptions, effectiveTab, effectiveKind, rootsForTab } from './contexts/templateTabs.helpers';
 import { variantMeta, targetTypeMeta } from '@ui/utils/contextStyles';
 
 export default function ContextsPage({ onOpenDetail, onNavigate }) {
@@ -18,15 +20,24 @@ export default function ContextsPage({ onOpenDetail, onNavigate }) {
   const [viewMode, setViewMode] = useState('tree');
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  // Sub-tab per template; in Organisation, which kind of tree (People ·
+  // Accounts · Resources). Null = not chosen yet, so the first tab with trees.
+  const [chosenTab, setChosenTab] = useState(null);
+  const [chosenKind, setChosenKind] = useState(null);
+  const tabs = useMemo(() => templateTabs(roots), [roots]);
+  const kinds = useMemo(() => kindOptions(roots), [roots]);
+  const activeTab = effectiveTab(tabs, chosenTab);
+  const activeKind = effectiveKind(kinds, chosenKind);
+  const visibleRoots = useMemo(() => rootsForTab(roots, activeTab, activeKind), [roots, activeTab, activeKind]);
 
-  // Auto-select the first root when roots load.
+  // Auto-select the first root of the tab when roots load or the tab changes.
   const effectiveRootId = useMemo(() => {
-    if (selectedRootId && roots.find(r => r.id === selectedRootId)) return selectedRootId;
-    return roots[0]?.id || null;
-  }, [roots, selectedRootId]);
+    if (selectedRootId && visibleRoots.find(r => r.id === selectedRootId)) return selectedRootId;
+    return visibleRoots[0]?.id || null;
+  }, [visibleRoots, selectedRootId]);
 
   const { nodes, loading: subtreeLoading, reload: reloadSubtree } = useContextSubtree(effectiveRootId);
-  const selectedRoot = roots.find(r => r.id === effectiveRootId);
+  const selectedRoot = visibleRoots.find(r => r.id === effectiveRootId);
   const [editError, setEditError] = useState(null);
 
   function open(id, name) {
@@ -167,10 +178,18 @@ export default function ContextsPage({ onOpenDetail, onNavigate }) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-180px)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <TemplateTabs
+        tabs={tabs}
+        active={activeTab}
+        onChange={setChosenTab}
+        kinds={kinds}
+        kind={activeKind}
+        onKindChange={setChosenKind}
+      />
       <div className="flex flex-1 min-h-0">
         <div className="w-80 flex-shrink-0">
           <ContextTreeSelector
-            roots={roots}
+            roots={visibleRoots}
             selectedRootId={effectiveRootId}
             onSelectRoot={setSelectedRootId}
             onNewTree={() => setNewModalOpen(true)}

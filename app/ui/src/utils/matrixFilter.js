@@ -187,3 +187,23 @@ export function matrixFilterFingerprint(filter) {
   for (const key of VIEW_STATE_KEYS) delete normalized[key];
   return canonical(normalized);
 }
+
+// ─── A matrix scoped to one context ─────────────────────────────────────────
+//
+// The `#matrix?filter=…` link that opens the matrix filtered on a context (and
+// its sub-contexts), spelled the way App.jsx's buildMatrixHash writes it. The
+// context lands on the side its members live on: a resource or system context
+// filters the resources, an identity or account context the subjects — and an
+// identity context switches the rows to identities, the only subjects it can
+// filter. App.jsx reads the filter from the URL when the page loads, so the
+// link is meant to open in a new tab.
+export function matrixHrefForContext(ctx) {
+  const cond = { kind: 'context', contextId: ctx.id, includeChildren: true };
+  const onResources = ctx.targetType === 'Resource' || ctx.targetType === 'System';
+  const filter = {
+    rowType: ctx.targetType === 'Identity' ? 'identity' : 'principal',
+    subject: { include: onResources ? [] : [cond], exclude: [] },
+    resource: { include: onResources ? [cond] : [], exclude: [] },
+  };
+  return `#matrix?${new URLSearchParams({ filter: JSON.stringify(filter) })}`;
+}

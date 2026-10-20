@@ -2,6 +2,8 @@ import { useState, useEffect, useReducer, useCallback } from 'react';
 import { useAuth } from '@ui/auth/AuthGate';
 import RiskScoreSection from './RiskScoreSection';
 import ContextDetailHeader from './ContextDetailHeader';
+import ContextProfile from './contexts/profiles/ContextProfile';
+import { profileFor } from './contexts/profiles/profiles';
 import ContextAttributesTab from './ContextAttributesTab';
 import ContextRelationshipsTab from './ContextRelationshipsTab';
 import TabBar from './TabBar';
@@ -141,6 +143,10 @@ export default function ContextDetailPage({ contextId, cachedData, onCacheData, 
   // would overwrite the analyst edit on the next crawl.
   const canEditMembers = isManual || isGenerated;
 
+  // Organisational units and applications show their template's facts and
+  // workflows first; tags, segments and the rest keep the generic page.
+  const profile = profileFor(detail.attributes.contextCategory);
+
   const hasRisk = features.riskScoring && riskData && riskData.riskScore != null;
   const tabs = [
     { key: 'attributes', label: 'Attributes' },
@@ -155,6 +161,10 @@ export default function ContextDetailPage({ contextId, cachedData, onCacheData, 
       <ContextDetailHeader attrs={detail.attributes} onClose={onClose} onOpenDetail={onOpenDetail} />
       {detail.attributes.description && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{detail.attributes.description}</div>
+      )}
+
+      {profile && (
+        <ContextProfile key={contextId} profile={profile} attrs={detail.attributes} subContexts={subContexts} onOpenDetail={onOpenDetail} />
       )}
 
       <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} />
