@@ -9,7 +9,7 @@ import { runSystemMembership } from './system-membership.helpers.js';
 
 const DEFAULTS = {
   rootName: 'Principals by system',
-  rootType: 'SystemMembershipRoot',
+  rootType: 'SystemMembership',
   childType: 'SystemMembership',
   noun: 'principals',
 };
@@ -23,7 +23,8 @@ export default {
     'members. Lets you scope the matrix to the accounts loaded from a single source system. Re-running ' +
     'reconciles: a new system gets a context, a removed system\'s context disappears.',
   targetType: 'Principal',
-  contextTypes: [DEFAULTS.rootType, DEFAULTS.childType],
+  contextCategory: 'Segment',
+  contextTypes: [DEFAULTS.childType],
   parametersSchema: {
     type: 'object',
     properties: {

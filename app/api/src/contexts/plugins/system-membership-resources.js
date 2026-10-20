@@ -8,7 +8,7 @@ import { runSystemMembership } from './system-membership.helpers.js';
 
 const DEFAULTS = {
   rootName: 'Resources by system',
-  rootType: 'SystemMembershipRoot',
+  rootType: 'SystemMembership',
   childType: 'SystemMembership',
   noun: 'resources',
 };
@@ -22,7 +22,8 @@ export default {
     'members. Lets you scope the matrix to the resources loaded from a single source system. Re-running ' +
     'reconciles: a new system gets a context, a removed system\'s context disappears.',
   targetType: 'Resource',
-  contextTypes: [DEFAULTS.rootType, DEFAULTS.childType],
+  contextCategory: 'Segment',
+  contextTypes: [DEFAULTS.childType],
   parametersSchema: {
     type: 'object',
     properties: {
