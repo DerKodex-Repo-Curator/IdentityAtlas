@@ -25,7 +25,7 @@ const router = Router();
 export const ROLE_BEARING_CATEGORIES = new Set(['OrganizationalUnit', 'LogicalApplication']);
 
 // Holder column → the table its display name comes from.
-const HOLDER_TABLE = { principalId: 'Principals', identityId: 'Identities' };
+export const HOLDER_TABLE = { principalId: 'Principals', identityId: 'Identities' };
 const HOLDER_NOT_FOUND = { principalId: 'Principal not found', identityId: 'Identity not found' };
 
 // Every role of one context, the Accountable first, with the holder's name
