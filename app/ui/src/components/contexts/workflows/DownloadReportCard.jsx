@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { useAuth } from '@ui/auth/AuthGate';
 import { downloadReport } from '@ui/components/reports/reportExport';
 import ReportError from '@ui/components/reports/ReportError';
-import { ENTITLEMENT_PIVOT_REPORT, reportTarget } from './reportTarget';
 
 // The spreadsheet is the report's primary artefact (it opens on its pivot
 // tables), so the card downloads that one format rather than listing them.
 const FORMAT = 'xlsx';
 
-// Action card: download the Entitlement Pivot for this application or unit —
-// every entitlement held here and who holds it. Runs through the same export
-// call the report tab's Download button uses (reports/reportExport.js), with
-// the one parameter that matters here: contexts = [this context]. The registry
-// only shows it where reportTarget() has an answer.
+// The Entitlement Pivot, by its unchanged slug.
+const ENTITLEMENT_PIVOT_REPORT = 'application-access-review';
+
+// Action card: download the Entitlement Pivot for this application — every
+// entitlement held here and who holds it. Runs through the same export call the
+// report tab's Download button uses (reports/reportExport.js), with the one
+// parameter that matters here: contexts = [this application]. The registry
+// shows it on applications only.
 export default function DownloadReportCard({ attrs }) {
   const { authFetch } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -22,7 +24,7 @@ export default function DownloadReportCard({ attrs }) {
     setBusy(true);
     setError(null);
     try {
-      await downloadReport({ authFetch, name: ENTITLEMENT_PIVOT_REPORT, format: FORMAT, params: { contexts: [reportTarget(attrs)] } });
+      await downloadReport({ authFetch, name: ENTITLEMENT_PIVOT_REPORT, format: FORMAT, params: { contexts: [attrs.id] } });
     } catch (e) {
       setError(e.message);
     } finally {

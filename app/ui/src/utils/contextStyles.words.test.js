@@ -55,9 +55,13 @@ describe('the source of a context in words', () => {
   const HR = { variant: 'synced', contextType: 'Department', scopeSystemName: 'Fortigi Demo HR' };
   const DEPT = { variant: 'generated', contextType: 'Department', sourceAlgorithmName: 'department-from-principal', scopeSystemName: 'Fortigi Demo EntraID' };
   const MGR = { variant: 'generated', contextType: 'ManagerHierarchy', sourceAlgorithmName: 'manager-hierarchy', scopeSystemName: 'Fortigi Demo EntraID' };
+  // As the API sends it: the rule's display name next to its key.
+  const DEPT_NAMED = { ...DEPT, sourceAlgorithmDisplayName: 'Department from Principal' };
 
   it('builds the subtitle sentence per source', () => {
     expect(contextSubtitle(HR)).toBe('Department · imported from Fortigi Demo HR');
+    expect(contextSubtitle(DEPT_NAMED)).toBe('Department · derived by the Department from Principal rule');
+    // Without a display name the rule is described by what it reads.
     expect(contextSubtitle(DEPT)).toBe('Department · derived from the department field on each account');
     expect(contextSubtitle({ ...MGR, contextType: 'Team' })).toBe('Team · derived from who reports to whom in Fortigi Demo EntraID');
     expect(contextSubtitle({ variant: 'manual', contextType: 'Department', createdByUser: 'system-bootstrap' }))
@@ -79,7 +83,10 @@ describe('the source of a context in words', () => {
     // A system is only added where the rule's sentence wants it.
     expect(ruleSourcePhrase({ sourceAlgorithmName: 'manager-hierarchy' })).toBe('who reports to whom');
     expect(ruleSourcePhrase(DEPT)).toBe('the department field on each account');
-    for (const a of [HR, DEPT, MGR, km]) expect(contextSubtitle(a)).not.toMatch(/plugin|crawl|analyst|variant|principal/i);
+    for (const a of [HR, DEPT, MGR]) expect(contextSubtitle(a)).not.toMatch(/plugin|crawl|analyst|variant|principal/i);
+    // A rule with a display name is named by it, in rule wording, never "plugin".
+    expect(contextSubtitle(km)).toBe('Derived by the K-Means Clustering rule');
+    expect(contextSubtitle(DEPT_NAMED)).not.toMatch(/plugin/i);
   });
 
   it('writes the edit-mode members note per source', () => {

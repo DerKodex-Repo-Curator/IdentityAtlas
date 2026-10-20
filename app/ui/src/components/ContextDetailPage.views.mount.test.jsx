@@ -19,7 +19,7 @@ const READER = { hasWildcard: false, permissions: new Set(['data.read']) };
 
 const UNIT = {
   id: 'ctx-1', variant: 'generated', targetType: 'Principal', contextType: 'Department', contextCategory: 'OrganizationalUnit',
-  displayName: 'Engineering', sourceAlgorithmName: 'department-from-principal', scopeSystemName: 'Demo EntraID',
+  displayName: 'Engineering', sourceAlgorithmName: 'department-from-principal', sourceAlgorithmDisplayName: 'Department from Principal', scopeSystemName: 'Demo EntraID',
   directMemberCount: 2, totalMemberCount: 5, userRenamed: false, lastCalculatedAt: '2026-10-20T12:06:02.810942+00:00',
   parentContextId: 'ctx-parent', parentDisplayName: 'Engineering Dept',
 };
@@ -56,7 +56,7 @@ describe('the business view (no data.write.contexts)', () => {
   it('shows the facts and members, without Edit, Timeline, raw details, member edit or a Close', async () => {
     const { authFetch } = mount({}, READER);
     expect(await screen.findByText('Alice Engineer')).toBeInTheDocument();
-    expect(screen.getByTestId('context-subtitle')).toHaveTextContent('Department · derived from the department field on each account');
+    expect(screen.getByTestId('context-subtitle')).toHaveTextContent('Department · derived by the Department from Principal rule');
     for (const name of ['Edit', 'Add sub-unit', 'Edit members', 'Back to Contexts']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
     }

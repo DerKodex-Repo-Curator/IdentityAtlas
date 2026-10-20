@@ -145,11 +145,19 @@ export function ruleSourcePhrase(attrs) {
   return name ? `the rule "${name}"` : 'a rule';
 }
 
-// "imported from Fortigi Demo HR" / "derived from …" / "created in Identity
-// Atlas" — '' for a source we cannot name.
+// What derived a context: the rule by the name it has under Admin, so a reader
+// can tell which rule made it — "derived by the Department from Principal
+// rule"; a rule without a display name is described by what it reads.
+function derivedDescription(attrs) {
+  const name = attrs.sourceAlgorithmDisplayName;
+  return name ? `derived by the ${name} rule` : `derived from ${ruleSourcePhrase(attrs)}`;
+}
+
+// "imported from Fortigi Demo HR" / "derived by the … rule" / "created in
+// Identity Atlas" — '' for a source we cannot name.
 export function sourceDescription(attrs) {
   if (attrs?.variant === 'synced') return `imported from ${attrs.scopeSystemName || 'a connected system'}`;
-  if (attrs?.variant === 'generated') return `derived from ${ruleSourcePhrase(attrs)}`;
+  if (attrs?.variant === 'generated') return derivedDescription(attrs);
   if (attrs?.variant === 'manual') return 'created in Identity Atlas';
   return '';
 }

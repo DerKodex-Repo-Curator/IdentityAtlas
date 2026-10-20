@@ -183,9 +183,9 @@ export default function ContextsPage({ onOpenDetail, onNavigate }) {
             </div>
           )}
 
-          {!selectedId && !rootsLoading && (
-            <div className="h-full flex items-center justify-center p-8 text-sm text-gray-600 dark:text-gray-400">
-              Pick a unit on the left.
+          {!selectedId && (
+            <div className="h-full flex items-center justify-center p-8 text-sm text-gray-600 dark:text-gray-400" data-testid="context-detail-empty">
+              {rootsLoading ? 'Loading…' : 'Pick a unit on the left.'}
             </div>
           )}
 

@@ -13,7 +13,7 @@ import {
 // kinds of member (Organisation only), "+ New", a search over every level and
 // the source / system filters — around the tree itself. The roots that pass the
 // filters are listed under a heading per source ("Imported · Fortigi Demo HR",
-// "Derived · department field on each account", "Created here"); the tree is
+// "Derived · Department from Principal", "Created here"); the tree is
 // the page's: `renderTree(groupRoots, group)` draws each group's roots.
 
 const SELECT_CLASS = 'flex-1 min-w-0 border rounded px-1 py-0.5 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200';
