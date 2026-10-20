@@ -6,7 +6,7 @@
 // reconcile matches the existing rows instead of minting a fresh key and
 // inserting a duplicate tree on every crawl.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 
 const query = vi.fn();
 const queryOne = vi.fn();
@@ -120,6 +120,7 @@ describe('refreshGeneratedContexts — templates and roles (phase B)', () => {
   it('writes every node under the plugin template, the node\'s own winning, and replaces the plugin\'s roles', async () => {
     wire([tree({ ikey: 'k1' })]);
     PLUGIN.contextCategory = 'OrganizationalUnit';
+    onTestFinished(() => { delete PLUGIN.contextCategory; });
     PLUGIN.run.mockResolvedValue({
       contexts: [
         { externalId: 'root', displayName: 'Org' },
@@ -136,13 +137,23 @@ describe('refreshGeneratedContexts — templates and roles (phase B)', () => {
     expect(inserts.map(([, p]) => p[11])).toEqual(['OrganizationalUnit', 'LogicalApplication']);
     expect(inserts[0][0]).toMatch(/"contextCategory"\)\s*VALUES/);
 
+    // Only roles the plugin no longer produces are removed: the kept keys go along, so an unchanged role keeps its row id.
     const roleDelete = query.mock.calls.find(([sql]) => /DELETE FROM "ContextRoles"/.test(sql));
-    expect(roleDelete[0]).toMatch(/"addedBy" = 'algorithm'/);
+    expect(roleDelete[0]).toMatch(/r."addedBy" = 'algorithm'/);
+    expect(roleDelete[0]).toMatch(/AND NOT EXISTS/);
+    const [produced, keepCtx, keepHolder, keepRole] = roleDelete[1];
+    expect(keepCtx).toEqual([roleInsertCtx()]);
+    expect(produced).toContain(keepCtx[0]);
+    expect([keepHolder, keepRole]).toEqual([['mgr-1'], ['Accountable']]);
     const roleInsert = query.mock.calls.find(([sql]) => /INSERT INTO "ContextRoles"/.test(sql));
     expect(roleInsert[0]).toMatch(/ON CONFLICT DO NOTHING/);
     expect(roleInsert[1].slice(1)).toEqual(['mgr-1', null, 'Accountable']);
-    delete PLUGIN.contextCategory;
   });
+
+  // The context id the role insert targeted (the root node's).
+  function roleInsertCtx() {
+    return query.mock.calls.find(([sql]) => /INSERT INTO "ContextRoles"/.test(sql))[1][0];
+  }
 
   it('writes no template and touches no roles for a plugin that declares neither', async () => {
     wire([tree({ ikey: 'k1' })]);

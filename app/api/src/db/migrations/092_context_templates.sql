@@ -142,3 +142,27 @@ WHERE c."contextType" = 'Tag'
   AND c."variant"     = 'manual'
   AND c."targetType" IN ('Principal', 'Resource', 'Identity')
   AND COALESCE(c."extendedAttributes"->>'tagRoot', 'false') <> 'true';
+
+-- ─── 7. History ──────────────────────────────────────────────────────────────
+-- Who answers for a unit, and which units belong together, are governed facts:
+-- record every change in _history like the other governed tables (009). A
+-- plugin re-run keeps the rows it still produces, so history shows real changes.
+DO $$
+BEGIN
+    DROP TRIGGER IF EXISTS trg_history_ins_del ON "ContextRoles";
+    CREATE TRIGGER trg_history_ins_del
+    AFTER INSERT OR DELETE ON "ContextRoles"
+    FOR EACH ROW EXECUTE FUNCTION fg_record_history();
+
+    DROP TRIGGER IF EXISTS trg_history_upd ON "ContextRoles";
+    CREATE TRIGGER trg_history_upd
+    AFTER UPDATE ON "ContextRoles"
+    FOR EACH ROW
+    WHEN (OLD IS DISTINCT FROM NEW)
+    EXECUTE FUNCTION fg_record_history();
+
+    DROP TRIGGER IF EXISTS trg_history_ins_del ON "ContextRelationships";
+    CREATE TRIGGER trg_history_ins_del
+    AFTER INSERT OR DELETE ON "ContextRelationships"
+    FOR EACH ROW EXECUTE FUNCTION fg_record_history();
+END $$;

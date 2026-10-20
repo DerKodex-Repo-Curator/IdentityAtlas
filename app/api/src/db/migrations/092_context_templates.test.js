@@ -64,8 +64,10 @@ describe('migration 092 — context templates', () => {
     expect(statements).not.toMatch(/GraphTagAssignments/);
   });
 
-  it('drops nothing and never touches assignments', () => {
-    expect(statements).not.toMatch(/DROP |DELETE FROM|ResourceAssignments|assignmentType/);
+  it('drops no table, column or view, deletes no rows and never touches assignments', () => {
+    // DROP TRIGGER IF EXISTS is how the history triggers are (re)attached; nothing else is dropped.
+    expect(statements).not.toMatch(/DROP (TABLE|COLUMN|VIEW|INDEX)|DELETE FROM|ResourceAssignments|assignmentType/);
+    expect([...statements.matchAll(/DROP (\w+)/g)].map(m => m[1])).toEqual(['TRIGGER', 'TRIGGER', 'TRIGGER']);
   });
 });
 
@@ -74,5 +76,14 @@ describe('migration 092 — the backfill is the one mapping the ingest derives f
     const { CONTEXT_TYPE_CATEGORY } = await import('../../lib/contextCategories.js');
     const sqlMap = Object.fromEntries([...backfill.matchAll(/WHEN '(\w+)'\s+THEN '(\w+)'/g)].map(m => [m[1], m[2]]));
     expect(sqlMap).toEqual(CONTEXT_TYPE_CATEGORY);
+  });
+});
+
+describe('migration 092 — history on the new tables', () => {
+  it('records every change to context roles and relationships in _history', () => {
+    for (const table of ['ContextRoles', 'ContextRelationships']) {
+      expect(statements).toMatch(new RegExp(`AFTER INSERT OR DELETE ON "${table}"\\s+FOR EACH ROW EXECUTE FUNCTION fg_record_history\\(\\)`));
+    }
+    expect(statements).toMatch(/AFTER UPDATE ON "ContextRoles"\s+FOR EACH ROW\s+WHEN \(OLD IS DISTINCT FROM NEW\)/);
   });
 });

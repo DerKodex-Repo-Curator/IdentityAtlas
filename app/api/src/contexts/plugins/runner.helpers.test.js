@@ -1,7 +1,7 @@
 // Unit tests for the pure reconcile helpers (runner.helpers.js).
 
 import { describe, it, expect } from 'vitest';
-import { buildNewIdMap, buildMemberInsertBatch, buildRoleInsertBatch } from './runner.helpers.js';
+import { buildNewIdMap, buildMemberInsertBatch, buildRoleInsertBatch, roleKeys } from './runner.helpers.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -110,5 +110,17 @@ describe('buildRoleInsertBatch', () => {
     ], ids);
     expect(values).toHaveLength(1);
     expect(params).toEqual(['ctx-a', 'p2', null, 'Responsible']);
+  });
+});
+
+describe('roleKeys', () => {
+  it('lists the (context, holder, role) keys to keep, skipping what would not be inserted', () => {
+    const ids = new Map([['a', 'ctx-a'], ['b', 'ctx-b']]);
+    expect(roleKeys([
+      { contextExternalId: 'a', principalId: 'p1', role: 'Accountable' },
+      { contextExternalId: 'b', identityId: 'i1', role: 'Responsible' },
+      { contextExternalId: 'gone', principalId: 'p2', role: 'Accountable' },
+      { contextExternalId: 'a', principalId: 'p3', identityId: 'i3', role: 'Responsible' },
+    ], ids)).toEqual({ ctx: ['ctx-a', 'ctx-b'], holder: ['p1', 'i1'], role: ['Accountable', 'Responsible'] });
   });
 });

@@ -26,7 +26,7 @@ import * as db from '../../db/connection.js';
 import { randomUUID } from 'crypto';
 import { getPlugin } from './registry.js';
 import { wouldCreateCycle } from '../cycleGuard.js';
-import { buildNewIdMap, buildMemberInsertBatch, buildRoleInsertBatch } from './runner.helpers.js';
+import { buildNewIdMap, buildMemberInsertBatch, buildRoleInsertBatch, roleKeys } from './runner.helpers.js';
 
 // Second pass of reconcile: set parent pointers now that every target row exists.
 // Skips analyst-reparented nodes and unresolved parents, and — via wouldCreateCycle
@@ -384,15 +384,22 @@ async function replaceOwnedMembers(client, members, { newByExternalId, producedC
   counts.membersAdded = insertedNow;
 }
 
-// 5b) Replace the algorithm-owned roles of the produced contexts. An analyst's
+// 5b) Reconcile the algorithm-owned roles of the produced contexts. A role the
+// plugin still produces keeps its row (and its id, which a claim may point at);
+// only roles it no longer produces are removed, and new ones added. An analyst's
 // Accountable stays: the partial unique index refuses a second Accountable, and
 // ON CONFLICT DO NOTHING lets the plugin's row yield to it.
 async function replaceOwnedRoles(client, roles, { newByExternalId, producedContextIds }) {
   if (producedContextIds.length === 0) return;
+  const keep = roleKeys(roles, newByExternalId);
   await client.query(`
-    DELETE FROM "ContextRoles"
-     WHERE "contextId" = ANY($1::uuid[]) AND "addedBy" = 'algorithm'
-  `, [producedContextIds]);
+    DELETE FROM "ContextRoles" r
+     WHERE r."contextId" = ANY($1::uuid[]) AND r."addedBy" = 'algorithm'
+       AND NOT EXISTS (
+         SELECT 1 FROM unnest($2::uuid[], $3::text[], $4::text[]) AS k(ctx, holder, role)
+          WHERE k.ctx = r."contextId" AND k.role = r."role"
+            AND k.holder = COALESCE(r."principalId", r."identityId")::text)
+  `, [producedContextIds, keep.ctx, keep.holder, keep.role]);
   const BATCH = 500;
   for (let i = 0; i < roles.length; i += BATCH) {
     const { values, params } = buildRoleInsertBatch(roles.slice(i, i + BATCH), newByExternalId);

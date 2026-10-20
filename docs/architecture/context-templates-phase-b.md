@@ -23,7 +23,7 @@ answer for them. It is one pull request, with no behaviour change to `assignment
 | Scope hierarchy nodes | `Scope`, with the resource's own type in `extendedAttributes.resourceType`; no more borrowed resource types |
 | `ContextRecipe` | Not a kind of thing but a provenance. The recipe stores a template chosen at save time (default LogicalApplication); auto-detection and confirmation in the assistant is a follow-on |
 | Resource-bound org unit | Valid: "the resources dedicated to Inkoop" is an OrganizationalUnit of resources, linked to the one of persons by a context-to-context relationship `DedicatedTo`. Declared and stored now; the assistant proposing it is a follow-on |
-| Owner survey, best-guess owners | Later. Roles get a stable id so a claim (POC step 2) can attach a status to one |
+| Owner survey, best-guess owners | Later. A role the source still produces keeps its row and id across plugin re-runs, and every role change is in `_history`, so a claim (POC step 2) can refer to one |
 
 ## 2. Data
 

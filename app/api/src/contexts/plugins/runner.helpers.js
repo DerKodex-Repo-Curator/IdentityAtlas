@@ -19,6 +19,22 @@ export function buildNewIdMap(contexts, existingByExternalId) {
   return newByExternalId;
 }
 
+// The (context, holder, role) keys a plugin run produces, as three parallel
+// arrays for an unnest(): the roles to KEEP when reconciling. Same skipping
+// rules as buildRoleInsertBatch, so a role that would not be inserted is not kept.
+export function roleKeys(roles, newByExternalId) {
+  const out = { ctx: [], holder: [], role: [] };
+  for (const r of roles) {
+    const ctxId = newByExternalId.get(r.contextExternalId);
+    const holders = [r.principalId, r.identityId].filter(Boolean);
+    if (!ctxId || holders.length !== 1) continue;
+    out.ctx.push(ctxId);
+    out.holder.push(String(holders[0]));
+    out.role.push(r.role);
+  }
+  return out;
+}
+
 // Build the VALUES clause + params for one batch of role rows. A role names an
 // account or a person, exactly one; a row with neither or both, or with a
 // dangling context, is skipped.
