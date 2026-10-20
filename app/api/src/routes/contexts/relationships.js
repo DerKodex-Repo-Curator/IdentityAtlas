@@ -1,10 +1,14 @@
 // Context-to-context relationships — GET /api/contexts/:id/relationships,
 // POST /contexts/:id/relationships and DELETE /contexts/:id/relationships/:relId.
 //
-// One type so far: DedicatedTo — "the resources dedicated to Inkoop" (an
-// OrganizationalUnit of resources) points at the Inkoop unit of persons. A
-// relationship is stored once, from contextId to relatedContextId; the GET
-// lists it from both ends with its direction, so either detail page shows it.
+// One type so far: SameUnitAs — two contexts are one unit seen through a
+// different kind of member: "Contoso" as its people, its accounts and its
+// resources is three contexts, linked pairwise. A context still holds one kind
+// of member; the link is what lets the UI show the three as one unit.
+//
+// Symmetric: a pair is stored once (a unique index on the unordered pair), the
+// GET lists it from either end, and either end may delete it. "direction" in
+// the GET only says which way round it happens to be stored.
 // Design: docs/architecture/context-templates-phase-b.md.
 
 import { Router } from 'express';
@@ -53,8 +57,9 @@ router.get('/contexts/:id/relationships', async (req, res) => {
 
 // ─── POST /api/contexts/:id/relationships ────────────────────────────
 // Body: { relatedContextId, relationshipType }. 404 when either context is
-// missing; 400 on a self-link or when the pair already has this relationship
-// in either direction.
+// missing; 400 on a self-link, when the pair already has this relationship in
+// either direction, or when both hold the same kind of member (two people
+// contexts are two units, or one duplicated, never variants of one).
 router.post('/contexts/:id/relationships', writeContexts, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid ID format' });
   if (!useSql) return res.status(503).json({ error: 'SQL not configured' });
@@ -64,8 +69,11 @@ router.post('/contexts/:id/relationships', writeContexts, async (req, res) => {
   const { relatedContextId, relationshipType } = parsed;
 
   try {
-    const found = await db.query(`SELECT id FROM "Contexts" WHERE id = ANY($1::uuid[])`, [[req.params.id, relatedContextId]]);
+    const found = await db.query(`SELECT id, "targetType" FROM "Contexts" WHERE id = ANY($1::uuid[])`, [[req.params.id, relatedContextId]]);
     if (found.rows.length !== 2) return res.status(404).json({ error: 'Context not found' });
+    if (found.rows[0].targetType === found.rows[1].targetType) {
+      return res.status(400).json({ error: 'Variants of one unit hold different kinds of member; these two both hold ' + found.rows[0].targetType });
+    }
 
     const dup = await db.queryOne(`
       SELECT id FROM "ContextRelationships"

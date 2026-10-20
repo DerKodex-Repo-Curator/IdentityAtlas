@@ -79,7 +79,7 @@ erDiagram
         string addedBy "sync, algorithm, analyst"
         uuid contextId FK
         uuid relatedContextId FK
-        string relationshipType "DedicatedTo"
+        string relationshipType "SameUnitAs"
     }
     ContextRoles {
         uuid id PK

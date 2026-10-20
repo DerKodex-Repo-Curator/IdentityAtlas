@@ -22,7 +22,7 @@ answer for them. It is one pull request, with no behaviour change to `assignment
 | Root context types | Removed: a root is a context without a parent. The tag root is `Tag` with `extendedAttributes.tagRoot = true` |
 | Scope hierarchy nodes | `Scope`, with the resource's own type in `extendedAttributes.resourceType`; no more borrowed resource types |
 | `ContextRecipe` | Not a kind of thing but a provenance. The recipe stores a template chosen at save time (default LogicalApplication); auto-detection and confirmation in the assistant is a follow-on |
-| Resource-bound org unit | Valid: "the resources dedicated to Inkoop" is an OrganizationalUnit of resources, linked to the one of persons by a context-to-context relationship `DedicatedTo`. Declared and stored now; the assistant proposing it is a follow-on |
+| A unit with several variants | Valid and expected: a project, team or customer can exist as its people, its accounts and its resources — three contexts, each holding one kind of member, linked pairwise by the symmetric `SameUnitAs` (renamed from `SameUnitAs`, 2026-10-20). An Org Info list (a customer list with its people and resources) projects to the three variants and links them |
 | Owner survey, best-guess owners | Later. A role the source still produces keeps its row and id across plugin re-runs, and every role change is in `_history`, so a claim (POC step 2) can refer to one |
 
 ## 2. Data
@@ -32,7 +32,7 @@ Migration `092_context_templates.sql`:
 - `Contexts.contextCategory TEXT NULL CHECK IN ('OrganizationalUnit','LogicalApplication','Tag','Segment')`,
   backfilled from `contextType` for every known value; unknown values stay NULL (the UI shows them under "Other").
 - `ContextRoles` (`id` uuid, `contextId` → Contexts cascade, `principalId` → Principals cascade | `identityId` → Identities cascade (exactly one), `role` CHECK IN ('Accountable','Responsible'), `addedBy` CHECK IN ('sync','algorithm','analyst'), `createdAt`, `updatedAt`); unique per (context, holder, role); partial unique index on `contextId` where `role = 'Accountable'`.
-- `ContextRelationships` (`id`, `contextId`, `relatedContextId`, `relationshipType` CHECK IN ('DedicatedTo'), `addedBy`, `createdAt`); unique per triple; `contextId <> relatedContextId`.
+- `ContextRelationships` (`id`, `contextId`, `relatedContextId`, `relationshipType` CHECK IN ('SameUnitAs'), `addedBy`, `createdAt`); unique per triple; `contextId <> relatedContextId`.
 - Backfill `Accountable` (`addedBy = 'algorithm'`) on every manager-hierarchy node whose `externalId` is an existing principal id.
 - Root rows: `PrincipalTypeRoot → PrincipalType`, `ResourceTypeRoot → ResourceType`, `EntraGroupRoot → EntraGroupCategory`, `SystemMembershipRoot → SystemMembership`, `ScopeHierarchy → Scope`, `TagGroup → Tag + tagRoot`. Scope-hierarchy children: type into `extendedAttributes.resourceType`, `contextType = 'Scope'`.
 - `GraphTags` view recreated to leave the tag root out (`GraphTagAssignments` needs no change: the root has no members).
@@ -71,6 +71,6 @@ New:
 ## 6. Ontology (2.1.0)
 
 - `ia:ContextCategory` value list with four members, each `ia:denotesClass` its template; `ia:contextCategory` column on `ia:Context`. Check: the list equals the templates under `ia:Context`.
-- `ia:ContextRole` edge (Context → Principal | Identity) with `ia:ContextRoleType` (Accountable, Responsible); `ia:ContextRelationship` edge (Context → Context) with relationship type `ia:dedicatedTo`. Both in the Structure layer; neither reaches a resource, so the holding rule holds.
+- `ia:ContextRole` edge (Context → Principal | Identity) with `ia:ContextRoleType` (Accountable, Responsible); `ia:ContextRelationship` edge (Context → Context) with relationship type `ia:sameUnitAs`. Both in the Structure layer; neither reaches a resource, so the holding rule holds.
 - Six root classes removed; `ScopeContext` described; `CostCenterContext` moved under OrganizationalUnit.
 - Plugin check: a plugin's `contextCategory` names a template under `ia:Context`, and every type in its `contextTypes` sits under that template.

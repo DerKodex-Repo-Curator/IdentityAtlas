@@ -87,3 +87,11 @@ describe('migration 092 — history on the new tables', () => {
     expect(statements).toMatch(/AFTER UPDATE ON "ContextRoles"\s+FOR EACH ROW\s+WHEN \(OLD IS DISTINCT FROM NEW\)/);
   });
 });
+
+describe('migration 092 — SameUnitAs is symmetric', () => {
+  it('stores a pair once whichever way round it was posted', () => {
+    expect(statements).toMatch(/CREATE UNIQUE INDEX "ux_ContextRelationships_pair" ON "ContextRelationships"\s+\(LEAST\("contextId", "relatedContextId"\), GREATEST\("contextId", "relatedContextId"\), "relationshipType"\)/);
+    // The ordered-triple constraint is gone: (a,b) and (b,a) must collide.
+    expect(statements).not.toMatch(/ux_ContextRelationships_triple/);
+  });
+});

@@ -149,7 +149,6 @@ classDiagram
     Person <|-- User
     Software <|-- WorkloadIdentity
     Resource --> Resource : Contains
-    Context --> Context : DedicatedTo
     Application --> DelegatedPermission : DelegatesScope
     Resource --> Resource : GrantsAccessTo
     Application --> ServicePrincipalOwnership : HasAppOwnership
@@ -159,6 +158,7 @@ classDiagram
     Resource --> GroupOwnership : HasOwnership
     Resource --> ResourceOwnership : HasOwnership
     Principal --> Principal : Owner
+    Context --> Context : SameUnitAs
     Principal --> Principal : Sponsor
 ```
 <!-- END GENERATED: ontology core-classes -->
@@ -416,7 +416,7 @@ Edge: `contextId` → `memberId`.
 
 ### ContextRelationships
 
-`ia:ContextRelationship` · Edge table · A typed link between two contexts: the resources dedicated to an org unit.
+`ia:ContextRelationship` · Edge table · A typed link between two contexts: two variants of one unit (its people, its accounts, its resources).
 
 Identifier: `id` (uuid) — the instance IRI, not a property.
 
@@ -426,7 +426,7 @@ Edge: `contextId` → `relatedContextId`.
 
 | Value | Property | From → to | Meaning |
 |---|---|---|---|
-| `DedicatedTo` | `ia:dedicatedTo` | ia:Context → ia:Context | The subject (an OrganizationalUnit of resources) holds the resources dedicated to the object (the OrganizationalUnit of persons). The two are one unit seen from two sides. |
+| `SameUnitAs` | `ia:sameUnitAs` | ia:Context → ia:Context | The two contexts are one unit seen through a different kind of member: Contoso as its people, its accounts, its resources. Symmetric; stored once per pair. Each side still holds one kind of member, and the two hold different kinds. |
 
 | Column | Property | SQL type | Values / references | Description |
 |---|---|---|---|---|
@@ -434,7 +434,7 @@ Edge: `contextId` → `relatedContextId`.
 | `contextId` | `ia:contextId` | uuid | → Contexts | The context. Ingest alias: `contextExternalId`. |
 | `createdAt` | `ia:createdAt` | timestamp with time zone |  | When the context row was created. |
 | `relatedContextId` | `ia:relatedContextId` | uuid | → Contexts | The other context of the link. |
-| `relationshipType` | `ia:relationshipType` | text | `DedicatedTo` | The relationship type: one of the ia:typeValue of the properties stored in this edge table. |
+| `relationshipType` | `ia:relationshipType` | text | `SameUnitAs` | The relationship type: one of the ia:typeValue of the properties stored in this edge table. |
 
 ### ContextRoles
 

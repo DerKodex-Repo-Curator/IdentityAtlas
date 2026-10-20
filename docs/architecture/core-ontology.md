@@ -66,7 +66,7 @@ an exported constant that the code itself uses (`CONTEXT_VARIANTS`, `CONTEXT_TAR
 | Ownership resources (`lib/ownershipTypes.js`) | subclasses of `ia:ControlPermission`, each the range of exactly one ownership relationship | `ia:GroupOwnership` |
 | The template of a context, stored | the `ia:ContextCategory` value list, each value `ia:denotesTemplate` the template class; the `contextCategory` column | `ia:ContextCategory_OrganizationalUnit` |
 | Who answers for a context | `ia:ContextRole`: an edge from a context to an account or a person, `role` from `ia:ContextRoleType` (Accountable, at most one; Responsible, many) | Piet is Accountable for his team |
-| Two contexts linked | `ia:ContextRelationship`, relationship type `ia:dedicatedTo` | the resources dedicated to an org unit → the org unit |
+| Two contexts linked | `ia:ContextRelationship`, relationship type `ia:sameUnitAs` (symmetric) | Contoso's people ↔ Contoso's resources |
 | Who answers for an account | the `ia:Accountability` value list (Personal, Shared, Autonomous), with `ia:accountabilityDefault` per principal type; declared ahead of its column | `ia:User` → Personal |
 | `contextType` (open) | subclasses of `ia:Context` named `<Value>Context`, with `ia:typeValue`, `ia:producedBy` (the plugin, if one emits it) and `ia:allowedTargetType` (the `ia:EntityKind` values it may group) | `ia:ManagerHierarchyContext` |
 
@@ -118,7 +118,7 @@ own is that holding it never makes the holder a member of what it controls: `ia:
 | An AI agent acting for a person | AIAgent, accountability Personal | Owner link agent → person | — |
 | Member of a team | an OrganizationalUnit context | ContextMembers | — |
 | Manager of a team | an OrganizationalUnit context | ContextRoles: Accountable | — |
-| The resources that belong to a team | an OrganizationalUnit context of resources | ContextRelationships: DedicatedTo | — |
+| The resources that belong to a team | a second OrganizationalUnit context, of resources | ContextRelationships: SameUnitAs | — |
 
 Templates are the level the application reasons at: three for accounts (Person, Software, Agent),
 seven for resources (Group, TechnicalRole, Permission, Application, Scope, BusinessRole, Other) and

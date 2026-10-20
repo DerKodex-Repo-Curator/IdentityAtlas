@@ -221,7 +221,7 @@ ia:ContextRole a owl:Class ; rdfs:subClassOf ia:Edge ;
 
 ia:ContextRelationship a owl:Class ; rdfs:subClassOf ia:Edge ;
     rdfs:label "Context relationship" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
-    rdfs:comment "A typed link between two contexts: the resources dedicated to an org unit." ;
+    rdfs:comment "A typed link between two contexts: two variants of one unit (its people, its accounts, its resources)." ;
     ia:table "ContextRelationships" ; ia:identifierColumn "id" ; ia:identifierSqlType "uuid" ;
     ia:typeColumn "relationshipType" ;
     ia:sourceProperty ia:contextId ; ia:targetProperty ia:relatedContextId .
@@ -548,7 +548,7 @@ ia:MembershipSource_analyst a owl:NamedIndividual, ia:MembershipSource ; ia:type
 
 ia:OrganizationalUnit a owl:Class ; rdfs:subClassOf ia:Context ; ia:template true ;
     rdfs:label "Organizational unit" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
-    rdfs:comment "Organisation structure: a department, a team, a manager's reports, an OU, a cost center, a project or a program. Groups persons or their accounts, or the resources dedicated to such a unit (linked to it by dedicatedTo); may form a tree; may carry an Accountable and Responsible (ContextRoles); the entry point for manager-led role mining." .
+    rdfs:comment "Organisation structure: a department, a team, a manager's reports, an OU, a cost center, a project or a program. Groups persons or their accounts, or the resources that belong to such a unit — each a separate context, linked as variants by sameUnitAs; may form a tree; may carry an Accountable and Responsible (ContextRoles); the entry point for manager-led role mining." .
 ia:Segment a owl:Class ; rdfs:subClassOf ia:Context ; ia:template true ;
     rdfs:label "Segment" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
     rdfs:comment "A grouping by a shared attribute or an analysis (by type, by system, risky consent, a cluster, a recipe). Membership is computed and read-only; no manager, no moving." .
@@ -697,10 +697,10 @@ ia:hasAppOwnership a owl:ObjectProperty ; ia:typeValue "HasAppOwnership" ; ia:st
 
 # ─── Relationship types (ContextRelationships.relationshipType) ──────────────
 
-ia:dedicatedTo a owl:ObjectProperty ; ia:typeValue "DedicatedTo" ; ia:storedIn ia:ContextRelationship ;
+ia:sameUnitAs a owl:ObjectProperty, owl:SymmetricProperty ; ia:typeValue "SameUnitAs" ; ia:storedIn ia:ContextRelationship ;
     rdfs:domain ia:Context ; rdfs:range ia:Context ;
-    rdfs:label "dedicated to" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
-    rdfs:comment "The subject (an OrganizationalUnit of resources) holds the resources dedicated to the object (the OrganizationalUnit of persons). The two are one unit seen from two sides." .
+    rdfs:label "same unit as" ; rdfs:isDefinedBy <https://identityatlas.io/ontology> ;
+    rdfs:comment "The two contexts are one unit seen through a different kind of member: Contoso as its people, its accounts, its resources. Symmetric; stored once per pair. Each side still holds one kind of member, and the two hold different kinds." .
 
 # ─── Relationship types (PrincipalRelationships.relationshipType) ────────────
 

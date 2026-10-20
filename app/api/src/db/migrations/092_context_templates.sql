@@ -4,7 +4,7 @@
 -- four templates: OrganizationalUnit, LogicalApplication, Tag, Segment. This
 -- migration makes the template a column, gives an organizational unit and a
 -- logical application the people who answer for them, lets two contexts be
--- linked (the resources dedicated to an org unit), and retires the six root
+-- linked as variants of one unit (its people, its accounts, its resources), and retires the six root
 -- context types: a root is simply a context without a parent.
 -- Design: docs/architecture/context-templates-phase-b.md.
 --
@@ -108,18 +108,22 @@ SELECT c.id, p.id, 'Accountable', 'algorithm'
  WHERE c."sourceAlgorithmId" = (SELECT id FROM "ContextAlgorithms" WHERE name = 'manager-hierarchy');
 
 -- ─── 5. Context to context ───────────────────────────────────────────────────
--- DedicatedTo: the resources that belong to an org unit (an OrganizationalUnit
--- of resources linked to the OrganizationalUnit of persons).
+-- SameUnitAs: two contexts are one unit seen through a different kind of
+-- member — "Contoso" as its people, its accounts and its resources is three
+-- contexts, linked pairwise. Symmetric, so a pair is stored once whichever way
+-- round it was posted (the pair index below); the API refuses two variants that
+-- hold the same kind of member.
 CREATE TABLE "ContextRelationships" (
     "id"               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "contextId"        UUID NOT NULL REFERENCES "Contexts"("id") ON DELETE CASCADE,
     "relatedContextId" UUID NOT NULL REFERENCES "Contexts"("id") ON DELETE CASCADE,
-    "relationshipType" TEXT NOT NULL CHECK ("relationshipType" IN ('DedicatedTo')),
+    "relationshipType" TEXT NOT NULL CHECK ("relationshipType" IN ('SameUnitAs')),
     "addedBy"          TEXT NOT NULL CHECK ("addedBy" IN ('sync', 'algorithm', 'analyst')),
     "createdAt"        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT "ck_ContextRelationships_not_self" CHECK ("contextId" <> "relatedContextId"),
-    CONSTRAINT "ux_ContextRelationships_triple" UNIQUE ("contextId", "relatedContextId", "relationshipType")
+    CONSTRAINT "ck_ContextRelationships_not_self" CHECK ("contextId" <> "relatedContextId")
 );
+CREATE UNIQUE INDEX "ux_ContextRelationships_pair" ON "ContextRelationships"
+  (LEAST("contextId", "relatedContextId"), GREATEST("contextId", "relatedContextId"), "relationshipType");
 CREATE INDEX "ix_ContextRelationships_related" ON "ContextRelationships" ("relatedContextId");
 
 -- ─── 6. The tags compatibility view leaves the root out ──────────────────────

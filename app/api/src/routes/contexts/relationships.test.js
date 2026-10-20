@@ -1,5 +1,5 @@
 // Unit tests for routes/contexts/relationships.js — context-to-context links
-// (DedicatedTo). DB mocked; the auth gate is a passthrough.
+// (SameUnitAs). DB mocked; the auth gate is a passthrough.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
@@ -24,15 +24,15 @@ beforeEach(() => {
 });
 
 describe('parseRelationshipBody', () => {
-  it('accepts a DedicatedTo link to another context, lower-casing the id', () => {
-    expect(parseRelationshipBody({ relatedContextId: OTHER.toUpperCase(), relationshipType: 'DedicatedTo' }, CTX))
-      .toEqual({ relatedContextId: OTHER, relationshipType: 'DedicatedTo' });
+  it('accepts a SameUnitAs link to another context, lower-casing the id', () => {
+    expect(parseRelationshipBody({ relatedContextId: OTHER.toUpperCase(), relationshipType: 'SameUnitAs' }, CTX))
+      .toEqual({ relatedContextId: OTHER, relationshipType: 'SameUnitAs' });
   });
 
   it.each([
     ['an unknown type', { relatedContextId: OTHER, relationshipType: 'Contains' }, /relationshipType must be one of DedicatedTo/],
-    ['a missing related id', { relationshipType: 'DedicatedTo' }, /relatedContextId \(uuid\) is required/],
-    ['a self-link', { relatedContextId: CTX.toUpperCase(), relationshipType: 'DedicatedTo' }, /cannot relate to itself/],
+    ['a missing related id', { relationshipType: 'SameUnitAs' }, /relatedContextId \(uuid\) is required/],
+    ['a self-link', { relatedContextId: CTX.toUpperCase(), relationshipType: 'SameUnitAs' }, /cannot relate to itself/],
   ])('rejects %s', (_label, body, message) => {
     expect(parseRelationshipBody(body, CTX)).toMatchObject({ status: 400, message });
   });
@@ -51,8 +51,8 @@ describe('GET /contexts/:id/relationships', () => {
   it('lists both directions with the other end resolved', async () => {
     queryOne.mockResolvedValueOnce({ id: CTX });
     const rows = [
-      { id: REL, relationshipType: 'DedicatedTo', direction: 'out', relatedContextId: OTHER, relatedDisplayName: 'Inkoop', addedBy: 'analyst' },
-      { id: OTHER, relationshipType: 'DedicatedTo', direction: 'in', relatedContextId: REL, relatedDisplayName: 'Inkoop resources', addedBy: 'analyst' },
+      { id: REL, relationshipType: 'SameUnitAs', direction: 'out', relatedContextId: OTHER, relatedDisplayName: 'Inkoop', addedBy: 'analyst' },
+      { id: OTHER, relationshipType: 'SameUnitAs', direction: 'in', relatedContextId: REL, relatedDisplayName: 'Inkoop resources', addedBy: 'analyst' },
     ];
     query.mockResolvedValueOnce({ rows });
     const res = await request(app).get(`/api/contexts/${CTX}/relationships`);
@@ -73,7 +73,7 @@ describe('GET /contexts/:id/relationships', () => {
 
 describe('POST /contexts/:id/relationships', () => {
   const post = (body) => request(app).post(`/api/contexts/${CTX}/relationships`).send(body);
-  const valid = { relatedContextId: OTHER, relationshipType: 'DedicatedTo' };
+  const valid = { relatedContextId: OTHER, relationshipType: 'SameUnitAs' };
 
   it('400 on a malformed context id', async () => {
     expect((await request(app).post('/api/contexts/nope/relationships').send(valid)).status).toBe(400);
@@ -92,22 +92,31 @@ describe('POST /contexts/:id/relationships', () => {
     expect(query.mock.calls[0][1]).toEqual([[CTX, OTHER]]);
   });
 
+  it('400 when both hold the same kind of member — two people contexts are not variants of one unit', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: CTX, targetType: 'Identity' }, { id: OTHER, targetType: 'Identity' }] });
+    const res = await post(valid);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Variants of one unit hold different kinds of member; these two both hold Identity');
+    expect(queryOne).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('400 when the pair already has this relationship in either direction', async () => {
-    query.mockResolvedValueOnce({ rows: [{ id: CTX }, { id: OTHER }] });
+    query.mockResolvedValueOnce({ rows: [{ id: CTX, targetType: 'Identity' }, { id: OTHER, targetType: 'Resource' }] });
     queryOne.mockResolvedValueOnce({ id: REL });
     const res = await post(valid);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/already have this relationship/);
     const [sql, params] = queryOne.mock.calls[0];
     expect(sql).toContain('("contextId" = $1 AND "relatedContextId" = $2) OR ("contextId" = $2 AND "relatedContextId" = $1)');
-    expect(params).toEqual([CTX, OTHER, 'DedicatedTo']);
+    expect(params).toEqual([CTX, OTHER, 'SameUnitAs']);
     expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('201 stores the link as the analyst\'s', async () => {
-    query.mockResolvedValueOnce({ rows: [{ id: CTX }, { id: OTHER }] });
+    query.mockResolvedValueOnce({ rows: [{ id: CTX, targetType: 'Identity' }, { id: OTHER, targetType: 'Resource' }] });
     queryOne.mockResolvedValueOnce(null);
-    const row = { id: REL, contextId: CTX, relatedContextId: OTHER, relationshipType: 'DedicatedTo', addedBy: 'analyst' };
+    const row = { id: REL, contextId: CTX, relatedContextId: OTHER, relationshipType: 'SameUnitAs', addedBy: 'analyst' };
     query.mockResolvedValueOnce({ rows: [row] });
     const res = await post(valid);
     expect(res.status).toBe(201);
@@ -115,7 +124,7 @@ describe('POST /contexts/:id/relationships', () => {
     const [sql, params] = query.mock.calls[1];
     expect(sql).toContain('INSERT INTO "ContextRelationships"');
     expect(sql).toContain(`VALUES ($1, $2, $3, 'analyst')`);
-    expect(params).toEqual([CTX, OTHER, 'DedicatedTo']);
+    expect(params).toEqual([CTX, OTHER, 'SameUnitAs']);
   });
 
   it('500 when the write rejects', async () => {

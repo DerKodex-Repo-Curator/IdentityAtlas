@@ -1,6 +1,6 @@
 - Every grouping (context) now carries its template — organisation, application, tag or segment — and the Contexts page groups trees that way, with the source of each tree as caption
 - An organisational unit or a logical application can record who answers for it: one accountable person (its manager or owner) and any number of responsible people; the manager hierarchy fills in the accountable manager of every team
-- Two groupings can be linked: the resources dedicated to an organisational unit point at the unit of its people
+- A unit can exist as several groupings — its people, its accounts and its resources — each holding one kind of member, linked as variants of the same unit
 - The roots of generated trees no longer carry a type of their own; the Azure scope tree's nodes are scopes with the resource type as an attribute
 - The ontology (2.1.0) describes the template column, context roles and context relationships, and CI checks that every plugin's types sit under the template it declares
 - Context trees are now grouped by template (Organisation, Applications, Tags, Segments, Other) and show where each tree came from, the plugin or the source system, instead of the raw type name

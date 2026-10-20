@@ -55,8 +55,9 @@ export const CONTEXT_CATEGORIES = ['OrganizationalUnit', 'LogicalApplication', '
 // Who answers for a context: at most one Accountable, any number Responsible.
 // A context→person link, never access (migration 092 CHECK).
 export const CONTEXT_ROLE_TYPES = ['Accountable', 'Responsible'];
-// Context→context links (migration 092 CHECK): the resources dedicated to an org unit.
-export const CONTEXT_RELATIONSHIP_TYPES = ['DedicatedTo'];
+// Context→context links (migration 092 CHECK). SameUnitAs: two contexts are one unit
+// seen through a different kind of member (its people, its accounts, its resources).
+export const CONTEXT_RELATIONSHIP_TYPES = ['SameUnitAs'];
 
 // Schema definitions per entity type. Exported read-only for the core ontology
 // check, which verifies every field of the core entities is described there.

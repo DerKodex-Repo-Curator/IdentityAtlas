@@ -45,7 +45,7 @@ flowchart LR
     Context -->|"ContextMembers"| Resource
     Context -->|"ContextMembers"| Principal
     Context -->|"ContextMembers"| System
-    Context -->|"ContextRelationships<br/><small>DedicatedTo</small>"| Context
+    Context -->|"ContextRelationships<br/><small>SameUnitAs</small>"| Context
     Context -->|"ContextRoles"| Principal
     Context -->|"ContextRoles"| Identity
     Identity -->|"IdentityMembers"| Principal
@@ -217,7 +217,7 @@ An organizational unit or a logical application can say **who answers for it**: 
 (its manager or owner) and any number of *Responsible* people, each an account or a person. That is a
 link from the grouping to the person (`ContextRoles`), never access: nobody gains anything by being
 accountable for a team. Two org units can be two sides of one unit, the persons and the resources
-dedicated to them, linked by `DedicatedTo`.
+that belong to them, linked as two variants of one unit by `SameUnitAs`.
 
 <!-- BEGIN GENERATED: ontology types-context -->
 ```mermaid
