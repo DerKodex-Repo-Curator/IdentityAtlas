@@ -12,9 +12,9 @@ const MH = { id: 'mh', variant: 'generated', sourceAlgorithmName: 'manager-hiera
 const MAN = { id: 'man', variant: 'manual' };
 
 describe('sourceGroupOf', () => {
-  it('says where a tree comes from in words — never the rule\'s internal name', () => {
+  it('says where a tree comes from — a derived tree by the display name of the rule that made it', () => {
     expect(sourceGroupOf(HR)).toMatchObject({ key: 'synced:3', title: 'Imported', detail: 'Fortigi Demo HR' });
-    expect(sourceGroupOf(DEPT)).toMatchObject({ title: 'Derived', detail: 'department field on each account' });
+    expect(sourceGroupOf(DEPT)).toMatchObject({ key: 'generated:department-from-principal:', title: 'Derived', detail: 'Department from Principal' });
     expect(sourceGroupOf(MH)).toMatchObject({ key: 'hierarchy:9', title: 'Manager hierarchy', detail: 'Entra ID' });
     expect(sourceGroupOf(MAN)).toEqual({ key: 'manual', cls: 'manual', title: 'Created here', detail: null });
   });

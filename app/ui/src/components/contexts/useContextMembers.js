@@ -16,9 +16,12 @@ export function useContextMembers(authFetch, contextId, refreshKey) {
   // Flipped synchronously inside the fetch effect; a reducer dispatch keeps
   // that clear of set-state-in-effect.
   const [membersLoading, setMembersLoading] = useReducer((_, v) => v, false);
+  // A failed read is shown ("Members could not be loaded"), never passed off as an empty unit.
+  const [membersError, setMembersError] = useReducer((_, v) => v, null);
 
   const fetchMembers = useCallback(() => {
     setMembersLoading(true);
+    setMembersError(null);
     const params = new URLSearchParams({
       limit: String(MEMBER_PAGE_SIZE),
       offset: String(memberPage * MEMBER_PAGE_SIZE),
@@ -32,7 +35,10 @@ export function useContextMembers(authFetch, contextId, refreshKey) {
         setMembers(data.data || []);
         setMemberTotal(data.total || 0);
       })
-      .catch((err) => console.error('Failed to load context members:', err))
+      .catch((err) => {
+        console.error('Failed to load context members:', err);
+        setMembersError(err.message || 'Failed to load members');
+      })
       .finally(() => setMembersLoading(false));
   }, [authFetch, contextId, memberPage, memberSearch, includeDescendants]);
 
@@ -48,7 +54,7 @@ export function useContextMembers(authFetch, contextId, refreshKey) {
   }
 
   return {
-    members, memberTotal, membersLoading, fetchMembers,
+    members, memberTotal, membersLoading, membersError, fetchMembers,
     memberPage, setMemberPage, memberSearch, setMemberSearch, includeDescendants, setIncludeDescendants,
   };
 }

@@ -57,7 +57,7 @@ function MembersPanel({
   id, contextId, attrs, canEditMembers,
   includeDescendants, onIncludeDescendantsChange,
   memberSearch, onMemberSearchChange,
-  members, memberTotal, membersLoading,
+  members, memberTotal, membersLoading, membersError,
   memberPage, onMemberPageChange, pageSize,
   authFetch, onMembersChanged, onOpenDetail,
 }) {
@@ -113,7 +113,7 @@ function MembersPanel({
       {editMode && <MemberEditBox contextId={contextId} attrs={attrs} members={members} onAdded={onMembersChanged} />}
 
       <MembersBody
-        loading={membersLoading} members={members} attrs={attrs} editMode={editMode}
+        loading={membersLoading} error={membersError} members={members} attrs={attrs} editMode={editMode}
         includeDescendants={includeDescendants} onOpenDetail={onOpenDetail} onRemove={removeMember}
       />
       {!membersLoading && members.length > 0 && totalPages > 1 && (
@@ -134,8 +134,9 @@ function MemberEditBox({ contextId, attrs, members, onAdded }) {
   );
 }
 
-function MembersBody({ loading, members, ...tableProps }) {
+function MembersBody({ loading, error, members, ...tableProps }) {
   if (loading) return <div className="text-center text-gray-600 dark:text-gray-400 py-8 text-sm">Loading members…</div>;
+  if (error) return <div role="alert" className="text-center text-red-700 dark:text-red-400 py-8 text-sm">Members could not be loaded ({error}).</div>;
   if (members.length === 0) return <div className="text-center text-gray-600 dark:text-gray-400 py-8 text-sm">No members found.</div>;
   return <MembersTable members={members} {...tableProps} />;
 }
