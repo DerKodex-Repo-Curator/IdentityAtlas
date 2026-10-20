@@ -1,5 +1,33 @@
 ## Changes in this PR
 
+- Azure: new guide "Managing the Azure deployment as code", with ready-to-copy workflows. One proposes each new stable release as a pull request with the release notes; the other shows a what-if on that pull request and deploys after the merge. Template changes arrive in the same reviewable pull request as the new images.
+- Azure: sign-in can now be configured in the deployment template itself (`entraTenantId` / `entraClientId`), so redeploying to upgrade no longer clears it. Configuring it afterwards with Step 2 keeps working as before.
+
+## Changes in this PR
+
+- Every release now includes `IdentityAtlas-azure-<version>.zip`: the Azure template as it is at that release, set to deploy exactly that release's images by default. Keep it in your own repository to manage the deployment as code: the template and the images it runs can no longer drift apart, and an upgrade brings template changes and new images in together.
+
+## Changes in this PR
+
+- Azure: deploy an exact release with the new `imageTag` parameter (for example `6.0.2.0`). It applies to the web app, the worker and the report generator together, overrides `imageChannel`, and makes every deployment reproducible: upgrading or rolling back is a change to one value, and redeploying creates the new revision without a manual restart. Leaving it empty keeps today's behaviour.
+- Azure: pull the images from your own Azure Container Registry (for example a pull-through cache of ghcr.io) with the new `containerRegistryResourceId` parameter. The template creates a pull-only identity and grants it AcrPull on that registry.
+- Azure: redeploying no longer issues a new report generator API key every time, which restarted both containers even when nothing had changed. The key is now generated once and kept in Key Vault.
+
+## Changes in this PR
+
+- Fixed the Reports page intermittently failing with "Error loading reports (HTTP 500)" on deployments with several custom reports and a large dataset. The page no longer looks up the deployment's attributes and value lists once per custom report, and requests that arrive together now share one lookup instead of each starting their own.
+
+## Changes in this PR
+
+- Releases can no longer contain code that has not been merged to `main` through an approved pull request. Cut Release and Cut Beta refuse a ref that is not on `main`. Cut Hotfix refuses any commit that is not a clean `git cherry-pick -x` of a commit on `main`. All three must be started from `main`.
+- Changed the hotfix procedure: fix on `main` first (PR, approval, merge), then cherry-pick the merged commit with `-x` onto a branch from the release tag.
+
+## Changes in this PR
+
+- Fixed the **Deploy to Azure** button failing on every fresh install with "The specified KeyVault … could not be found" (`KeyVaultParameterReferenceNotFound`). The template now reads the Postgres password from Key Vault only after the vault has been created. Existing deployments are not affected and keep their password.
+
+## Changes in this PR
+
 - Fixed the report assistant not recognising you as the person asking when "I" is typed in lower case ("groups i'm in", "what do i own") or when access is "assigned to me" / "van mij": these now give a report about your own account instead of one about everybody.
 - The report assistant can now show who owns each group: "all groups with the group owner" lists the owners' names instead of only an owner count.
 - Group, resource, user and person reports can now show the contexts each row is part of (a *Contexts* column) and filter on them ("groups in the Crown Jewels context", "groups in no context"), both in the definition editor and from the *Ask* box.
