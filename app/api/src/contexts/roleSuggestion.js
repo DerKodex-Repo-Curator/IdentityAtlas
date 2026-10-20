@@ -80,17 +80,17 @@ export const SIGNALS = {
   Identity: {
     holderCol: 'identityId',
     sql: managerSql({ table: 'Identities', managerCol: 'managerIdentityId', memberType: 'Identity', holderCol: 'identityId', live: always }),
-    reason: (count, total) => `manager of ${share(count, total, 'member')}`,
+    reason: (count, total) => `manages ${share(count, total, 'member')}`,
   },
   Principal: {
     holderCol: 'principalId',
     sql: managerSql({ table: 'Principals', managerCol: 'managerId', memberType: 'Principal', holderCol: 'principalId', live: liveDeletedAt }),
-    reason: (count, total) => `manager of ${share(count, total, 'member')}`,
+    reason: (count, total) => `manages ${share(count, total, 'member')}`,
   },
   Resource: {
     holderCol: 'principalId',
     sql: OWNER_SQL,
-    reason: (count, total) => `owner of ${share(count, total, 'resource')}`,
+    reason: (count, total) => `owns ${share(count, total, 'resource')}`,
   },
 };
 

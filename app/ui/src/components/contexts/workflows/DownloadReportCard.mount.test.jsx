@@ -2,27 +2,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createElement as h } from 'react';
 import DownloadReportCard from './DownloadReportCard';
-import { SharedViewContext } from '@ui/contexts/SharedViewContext';
 import { renderWithProviders, makeAuthFetch, blobResponse, screen, waitFor, userEvent } from '@ui/test-utils/renderWithProviders';
 
 // The card runs the Entitlement Pivot through the report export endpoint —
-// the same call the report tab's Download button makes.
+// the same call the report tab's Download button makes — always on the context
+// itself (the API pivots an accounts unit on what its members hold).
 const EXPORT = '/api/reports/application-access-review/export?format=xlsx&contexts=';
 
 const APP = { id: 'c-app', displayName: 'SAP', contextCategory: 'LogicalApplication', targetType: 'Resource' };
 const RES_UNIT = { id: 'c-res', displayName: 'Finance shares', contextCategory: 'OrganizationalUnit', targetType: 'Resource' };
-const PEOPLE = { id: 'c-ppl', displayName: 'Finance', contextCategory: 'OrganizationalUnit', targetType: 'Identity' };
-const VARIANTS = [
-  { id: 'c-ppl', displayName: 'Finance', targetType: 'Identity', self: true },
-  { id: 'c-acc', displayName: 'Finance accounts', targetType: 'Principal', self: false },
-  { id: 'c-res', displayName: 'Finance shares', targetType: 'Resource', self: false },
-];
+const ACC_UNIT = { id: 'c-acc', displayName: 'Finance accounts', contextCategory: 'OrganizationalUnit', targetType: 'Principal' };
 
-function mount({ attrs, variants = [], variantsLoading = false, download } = {}) {
+function mount({ attrs, download } = {}) {
   const authFetch = makeAuthFetch((url) => (String(url).startsWith('/api/reports/')
     ? (download ? download() : blobResponse('xlsx-bytes', { type: 'application/octet-stream', filename: 'pivot.xlsx' }))
     : undefined));
-  renderWithProviders(h(DownloadReportCard, { attrs, variants, variantsLoading }), { auth: { authFetch } });
+  renderWithProviders(h(DownloadReportCard, { attrs }), { auth: { authFetch } });
   return { authFetch, user: userEvent.setup() };
 }
 
@@ -34,66 +29,30 @@ describe('DownloadReportCard', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('runs an application\'s report on the application itself', async () => {
-    const { authFetch, user } = mount({ attrs: APP, variants: VARIANTS });
-    expect(screen.queryByText(/Runs on this unit/)).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
-    expect(authFetch).toHaveBeenCalledWith(`${EXPORT}c-app`);
-    await waitFor(() => expect(globalThis.URL.createObjectURL).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: 'Download report' })).toBeEnabled();
+  it('says what the spreadsheet holds, in words a reader knows', () => {
+    mount({ attrs: APP });
+    expect(screen.getByRole('heading', { name: 'Download entitlement report' })).toBeInTheDocument();
+    expect(screen.getByText('Every entitlement held here and who holds it, with counts and owner, as a spreadsheet.')).toBeInTheDocument();
+    expect(screen.queryByText(/variant/i)).toBeNull();
   });
 
-  it('runs a resource unit\'s report on the unit itself', async () => {
-    const { authFetch, user } = mount({ attrs: RES_UNIT });
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
-    expect(authFetch).toHaveBeenCalledWith(`${EXPORT}c-res`);
-  });
-
-  it('runs a people unit\'s report on its resources variant, and says which', async () => {
-    const { authFetch, user } = mount({ attrs: PEOPLE, variants: VARIANTS });
-    expect(screen.getByText(/Runs on this unit's resources/)).toHaveTextContent('Finance shares');
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
-    expect(authFetch).toHaveBeenCalledWith(`${EXPORT}c-res`);
-    expect(authFetch).not.toHaveBeenCalledWith(`${EXPORT}c-ppl`);
-  });
-
-  it('without a resources variant, says so and offers the matrix scoped to the unit instead', () => {
-    const { authFetch } = mount({ attrs: { ...PEOPLE, targetType: 'Principal' }, variants: VARIANTS.slice(0, 1) });
-    expect(screen.getByText('This unit has no resources variant yet.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Download report' })).toBeNull();
-    const link = screen.getByRole('link', { name: 'Open in matrix' });
-    expect(link).toHaveAttribute('target', '_blank');
-    const raw = decodeURIComponent(link.getAttribute('href'));
-    const filter = JSON.parse(new URLSearchParams(raw.slice(raw.indexOf('?') + 1)).get('filter'));
-    expect(filter.subject.include).toEqual([{ kind: 'context', contextId: 'c-ppl', includeChildren: true }]);
-    expect(authFetch).not.toHaveBeenCalled();
-  });
-
-  it('waits for the variants before saying there is none', () => {
-    mount({ attrs: PEOPLE, variants: VARIANTS.slice(0, 1), variantsLoading: true });
-    expect(screen.getByText(/Looking for this unit's resources/)).toBeInTheDocument();
-    expect(screen.queryByText('This unit has no resources variant yet.')).toBeNull();
-  });
+  it.each([['an application', APP], ['a resource unit', RES_UNIT], ['a unit of accounts', ACC_UNIT]])(
+    'runs on the context itself for %s', async (_, attrs) => {
+      const { authFetch, user } = mount({ attrs });
+      await user.click(screen.getByRole('button', { name: 'Download (Excel)' }));
+      expect(authFetch).toHaveBeenCalledWith(`${EXPORT}${attrs.id}`);
+      expect(authFetch).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(globalThis.URL.createObjectURL).toHaveBeenCalled());
+    });
 
   it('shows "Preparing…" while the file is produced, and the failure when it cannot be', async () => {
     let fail;
     const { user } = mount({ attrs: APP, download: () => new Promise(res => { fail = () => res(blobResponse('{}', { ok: false, status: 500 })); }) });
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
+    await user.click(screen.getByRole('button', { name: 'Download (Excel)' }));
     expect(screen.getByRole('button', { name: 'Preparing…' })).toBeDisabled();
     fail();
     expect(await screen.findByText('Download failed')).toBeInTheDocument();
     expect(screen.getByText('HTTP 500')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download report' })).toBeEnabled();
-  });
-
-  it('in a read-only shell (a context owner) offers no matrix to fall back to', () => {
-    const authFetch = makeAuthFetch({});
-    renderWithProviders(
-      h(SharedViewContext.Provider, { value: true },
-        h(DownloadReportCard, { attrs: { ...PEOPLE, targetType: 'Principal' }, variants: VARIANTS.slice(0, 1), variantsLoading: false })),
-      { auth: { authFetch } },
-    );
-    expect(screen.getByText('This unit has no resources variant yet.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Open in matrix' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download (Excel)' })).toBeEnabled();
   });
 });

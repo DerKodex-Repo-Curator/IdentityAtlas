@@ -319,6 +319,21 @@ describe('GET /contexts/:id/members', () => {
     expect(dataSql).toContain('LIMIT 50 OFFSET 50000');
   });
 
+  // The members table shows email / job title / type / status — the page query
+  // must select them, or every row reads "-" (it once returned the name only).
+  it.each([
+    ['Principal', 'm.email, m."jobTitle", m."principalType", m."accountEnabled"'],
+    ['Identity', 'm.email, m."jobTitle", m.department'],
+    ['Resource', 'm."resourceType", m.description, m.enabled'],
+    ['System', 'm.description'],
+  ])('selects the shown columns for %s members', async (targetType, columns) => {
+    queryOne.mockResolvedValueOnce({ targetType });
+    query.mockResolvedValueOnce({ rows: [] });
+    queryOne.mockResolvedValueOnce({ total: 0 });
+    await request(app).get(`/api/contexts/${ID}/members?include=descendants`);
+    expect(query.mock.calls[0][0]).toContain(`m.id, m."displayName", ${columns},`);
+  });
+
   it('keeps the text comparison for System members (integer ids)', async () => {
     queryOne.mockResolvedValueOnce({ targetType: 'System' });
     query.mockResolvedValueOnce({ rows: [] });

@@ -1,0 +1,81 @@
+// Pure helpers for the members table in ContextRelationshipsTab.jsx: which
+// columns a kind of member has, which of them this page of members fills,
+// and what the action cell says in edit mode.
+
+const muted = (value) => <span className="text-gray-600 dark:text-gray-400">{value}</span>;
+const pill = (value) => (
+  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded px-1.5 py-0.5">{value}</span>
+);
+const status = (enabled) => (
+  <span className={`text-xs rounded px-1.5 py-0.5 ${enabled
+    ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+    : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'}`}>
+    {enabled ? 'Active' : 'Disabled'}
+  </span>
+);
+
+// The kind of account in plain words; an unknown type is shown as stored.
+const ACCOUNT_TYPE_WORDS = {
+  User: 'Member',
+  Member: 'Member',
+  Guest: 'Guest',
+  ServicePrincipal: 'Service account',
+  ManagedIdentity: 'Service account',
+  ServiceAccount: 'Service account',
+  AIAgent: 'AI agent',
+};
+
+export function accountTypeWord(principalType) {
+  return ACCOUNT_TYPE_WORDS[principalType] || principalType;
+}
+
+// The columns after Name, per kind of member — what the API returns for it
+// (MEMBER_COLUMNS in routes/contexts/read.js). `value` decides whether a row
+// has something to show; `render` draws it.
+export const MEMBER_TABLE_COLUMNS = {
+  Principal: [
+    { label: 'Email', value: m => m.email, render: m => muted(m.email) },
+    { label: 'Job title', value: m => m.jobTitle, render: m => muted(m.jobTitle) },
+    { label: 'Type', value: m => m.principalType, render: m => pill(accountTypeWord(m.principalType)) },
+    { label: 'Status', value: m => m.accountEnabled, render: m => status(m.accountEnabled) },
+  ],
+  Identity: [
+    { label: 'Email', value: m => m.email, render: m => muted(m.email) },
+    { label: 'Job title', value: m => m.jobTitle, render: m => muted(m.jobTitle) },
+    { label: 'Department', value: m => m.department, render: m => muted(m.department) },
+  ],
+  Resource: [
+    { label: 'Type', value: m => m.resourceType, render: m => pill(m.resourceType) },
+    { label: 'Description', value: m => m.description, render: m => muted(m.description) },
+    { label: 'Status', value: m => m.enabled, render: m => status(m.enabled) },
+  ],
+  System: [
+    { label: 'Description', value: m => m.description, render: m => muted(m.description) },
+  ],
+};
+
+const hasValue = (v) => v !== null && v !== undefined && v !== '';
+
+// The columns of this kind that at least one member on the page fills — a
+// column empty for every row is left out. A cell empty in a shown column
+// renders nothing.
+export function visibleMemberColumns(targetType, members) {
+  return (MEMBER_TABLE_COLUMNS[targetType] || [])
+    .filter(c => members.some(m => hasValue(c.value(m))))
+    .map(c => ({ label: c.label, render: m => (hasValue(c.value(m)) ? c.render(m) : null) }));
+}
+
+// The action cell of a member row in edit mode:
+//   remove   the member can be taken out and stays out
+//   note     it cannot — shown with sub-units included (the row may belong to
+//            a sub-unit), or because the rule that derived the unit puts it
+//            back on its next refresh ("from the rule")
+export function memberRowAction(member, attrs, includeDescendants) {
+  if (includeDescendants) {
+    return { kind: 'note', text: '—', title: 'Turn off "Include sub-units" to remove members' };
+  }
+  if (attrs.variant === 'generated' && member.addedBy === 'algorithm') {
+    return { kind: 'note', text: 'from the rule', title: 'Refreshed automatically; removing it here would not last' };
+  }
+  return { kind: 'remove' };
+}

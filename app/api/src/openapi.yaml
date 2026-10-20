@@ -3018,7 +3018,7 @@ components:
         principalId: { type: string, format: uuid }
         identityId: { type: string, format: uuid }
         displayName: { type: string }
-        reason: { type: string, example: manager of 11 of the 14 members }
+        reason: { type: string, example: manages 11 of the 14 members }
         count: { type: integer, description: Members the candidate manages or owns }
         total: { type: integer, description: Members of the context's kind }
     ContextRelationship:

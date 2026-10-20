@@ -1,20 +1,27 @@
-// Workflow cards per template: the work that starts from a context.
+// Action cards: the work that starts from a context.
 //
-// A card is a component taking { attrs, variants, variantsLoading,
-// onOpenDetail }. Adding a card is one line in a template's list; a template
-// without a list (Tag, Segment, Other) shows no workflows area at all. The
-// role interview and the owner survey will land here once built — they are not
-// shown before then.
+// Which templates have an Actions area at all is decided per template; which
+// cards it holds follows the kind of unit (see each entry's `when`). A card is a
+// component taking { attrs, variants, variantsLoading, onOpenDetail }. A
+// template without a list (Tag, Segment, Other) shows no Actions area. The role
+// interview and the owner survey will land here once built — they are not shown
+// before then.
 
+import MatrixCard from './MatrixCard';
 import DownloadReportCard from './DownloadReportCard';
+import { reportTarget } from './reportTarget';
 
-const DOWNLOAD_REPORT = { key: 'download-report', Card: DownloadReportCard };
+// inApp: the card opens a page of the app, which a read-only shell cannot reach.
+const VIEW_IN_MATRIX = { key: 'view-in-matrix', Card: MatrixCard, inApp: true };
+// Applications, resource units and units of accounts; not units of people.
+const DOWNLOAD_REPORT = { key: 'download-report', Card: DownloadReportCard, when: attrs => reportTarget(attrs) !== null };
 
-const WORKFLOWS = {
-  OrganizationalUnit: [DOWNLOAD_REPORT],
-  LogicalApplication: [DOWNLOAD_REPORT],
+const ACTIONS = {
+  OrganizationalUnit: [VIEW_IN_MATRIX, DOWNLOAD_REPORT],
+  LogicalApplication: [VIEW_IN_MATRIX, DOWNLOAD_REPORT],
 };
 
-export function workflowCardsFor(contextCategory) {
-  return WORKFLOWS[contextCategory] || [];
+/** The action cards this context shows, in order. */
+export function actionCardsFor(attrs) {
+  return (ACTIONS[attrs.contextCategory] || []).filter(card => !card.when || card.when(attrs));
 }

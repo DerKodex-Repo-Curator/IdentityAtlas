@@ -50,10 +50,12 @@ Everything else — any other path, and every non-GET — answers
 
 In the UI an owner gets a bare page (no main navigation): their context
 directly, or a list on the left when they hold several. The page is the
-ordinary context page in read-only mode: no Edit, no role pencils, no best
-guess, no member editing, members and people as plain text, a variant opening
-in place only when it is in scope. The workflows area, with **Download report**,
-stays.
+ordinary context page in its business (reading) view, read-only: no Edit, no
+role pencils, no suggestion, no member editing, members, sub-units and people
+as plain text, no Copy link or Open as page, a breadcrumb that names the direct
+parent without reading it, and a variant opening in place only when it is in
+scope. The Actions area keeps **Download entitlement report** (it runs on the
+context itself) and drops **View in matrix**, which the owner cannot open.
 
 ## Enforcement
 

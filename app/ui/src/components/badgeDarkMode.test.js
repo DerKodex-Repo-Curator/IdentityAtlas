@@ -33,7 +33,8 @@ describe('status/account badge dark-mode coverage', () => {
   });
 
   it('the selected node in the contexts tree carries dark: variants', () => {
-    const src = read('contexts/ContextTreeView.jsx');
+    // The row chip (and its selected state) lives in ContextTreeParts.
+    const src = read('contexts/ContextTreeParts.jsx');
     for (const tok of ['dark:bg-blue-900/30', 'dark:border-blue-400']) {
       expect(src, tok).toContain(tok);
     }

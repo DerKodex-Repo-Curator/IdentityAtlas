@@ -29,7 +29,7 @@ const relationships = [
   { id: 'r2', relationshipType: 'SameUnitAs', relatedContextId: ACCOUNTS, relatedDisplayName: 'Finance', relatedTargetType: 'Principal', relatedTotalMemberCount: 9 },
 ];
 
-function api() {
+function api(unitExtra = {}) {
   return makeAuthFetch((url) => {
     const u = String(url);
     if (u.includes('/roles/suggestion')) return { principalId: 'p-guess', displayName: 'Guessed Person', reason: 'manages most members' };
@@ -41,7 +41,7 @@ function api() {
     if (u.includes('/members')) return { total: 1, data: [{ id: 'm-1', displayName: 'Alice Member', principalType: 'User', addedBy: 'analyst' }] };
     if (u.includes('/timeline')) return { events: [] };
     if (u.includes('/risk-scores/')) return jsonResponse({}, { ok: false, status: 404 });
-    if (u.endsWith(`/api/contexts/${UNIT}`)) return unit(UNIT, 'Finance');
+    if (u.endsWith(`/api/contexts/${UNIT}`)) return unit(UNIT, 'Finance', unitExtra);
     if (u.endsWith(`/api/contexts/${SECOND}`)) return unit(SECOND, 'Payroll');
     if (u.endsWith(`/api/contexts/${RESOURCES}`)) return unit(RESOURCES, 'Finance', { targetType: 'Resource' });
     if (u.endsWith(`/api/contexts/${ACCOUNTS}`)) return jsonResponse({ error: 'Context owners can only open their own context' }, { ok: false, status: 403 });
@@ -51,8 +51,8 @@ function api() {
 
 const ctx = (id, displayName, role) => ({ id, displayName, role, contextCategory: 'OrganizationalUnit', targetType: 'Identity' });
 
-function mount(contexts, contextIds = [UNIT, RESOURCES, SECOND]) {
-  const authFetch = api();
+function mount(contexts, contextIds = [UNIT, RESOURCES, SECOND], unitExtra = {}) {
+  const authFetch = api(unitExtra);
   const logout = vi.fn();
   renderWithProviders(<ContextOwnerPage />, {
     auth: {
@@ -107,25 +107,47 @@ describe('ContextOwnerPage — one context', () => {
     expect(screen.queryByRole('button', { name: /Payroll team/ })).not.toBeInTheDocument();
   });
 
-  it('keeps the workflows: the report card runs on the unit\'s resources variant', async () => {
+  it('keeps the Actions without the matrix: a people unit points at its accounts view for the report', async () => {
     mount([ctx(UNIT, 'Finance', 'Responsible')]);
-    const card = await screen.findByTestId('workflow-download-report');
-    expect(await within(card).findByRole('button', { name: 'Download report' })).toBeInTheDocument();
-    expect(within(card).getByText('Finance')).toBeInTheDocument();
+    const actions = await screen.findByRole('region', { name: 'Actions' });
+    expect(await within(actions).findByTestId('actions-report-hint')).toBeInTheDocument();
+    expect(screen.queryByTestId('action-view-in-matrix')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /View in matrix/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('action-download-report')).not.toBeInTheDocument();
+  });
+
+  it('offers the report on an in-scope resources view, still without the matrix', async () => {
+    mount([ctx(UNIT, 'Finance', 'Responsible')]);
+    const variants = await screen.findByRole('group', { name: 'This unit as' });
+    await userEvent.click(within(variants).getByRole('button', { name: 'Resources 4' }));
+    const card = await screen.findByTestId('action-download-report');
+    expect(within(card).getByRole('button', { name: 'Download (Excel)' })).toBeInTheDocument();
+    expect(screen.queryByTestId('action-view-in-matrix')).not.toBeInTheDocument();
+  });
+
+  it('has no Copy link, and names the parent without reading it', async () => {
+    const PARENT = 'aaaaaaaa-0000-4000-8000-0000000000f1';
+    const { authFetch } = mount([ctx(UNIT, 'Finance', 'Accountable')], undefined,
+      { parentContextId: PARENT, parentDisplayName: 'Company' });
+    const crumbs = await screen.findByRole('navigation', { name: 'Breadcrumb' });
+    expect(within(crumbs).getByText('Company')).toBeInTheDocument();
+    expect(within(crumbs).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy link' })).not.toBeInTheDocument();
+    expect(fetched(authFetch, PARENT)).toBe(false);
   });
 
   it('opens an in-scope variant in place, and ignores one outside the scope', async () => {
     const { authFetch } = mount([ctx(UNIT, 'Finance', 'Responsible')]);
-    const variants = await screen.findByRole('group', { name: 'Variants of this unit' });
+    const variants = await screen.findByRole('group', { name: 'This unit as' });
 
     await userEvent.click(within(variants).getByRole('button', { name: 'Accounts 9' }));
-    expect(screen.getByRole('group', { name: 'Variants of this unit' })).toBeInTheDocument();
-    expect(within(screen.getByRole('group', { name: 'Variants of this unit' })).getByRole('button', { name: /^People/ }))
+    expect(screen.getByRole('group', { name: 'This unit as' })).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'This unit as' })).getByRole('button', { name: /^People/ }))
       .toHaveAttribute('aria-pressed', 'true');
 
     await userEvent.click(within(variants).getByRole('button', { name: 'Resources 4' }));
     await waitFor(() => {
-      const group = screen.getByRole('group', { name: 'Variants of this unit' });
+      const group = screen.getByRole('group', { name: 'This unit as' });
       expect(within(group).getByRole('button', { name: /^Resources/ })).toHaveAttribute('aria-pressed', 'true');
     });
     expect(fetched(authFetch, `/api/contexts/${RESOURCES}/members`)).toBe(true);

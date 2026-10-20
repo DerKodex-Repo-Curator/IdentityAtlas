@@ -12,8 +12,9 @@
 // someone's admin account still makes the person its owner.
 //
 // The scope also takes in each held context's variants (SameUnitAs): "Contoso"
-// as its people, its accounts and its resources is one unit, and the report a
-// people unit's owner downloads runs on its resources variant. Sub-contexts are
+// as its people, its accounts and its resources is one unit: the owner switches
+// between those views, and a people unit's report lives on its accounts view (the
+// report itself always runs on the context it is opened from). Sub-contexts are
 // NOT included.
 //
 // Every function takes the pool explicitly so the contract test can run the

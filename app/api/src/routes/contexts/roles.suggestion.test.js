@@ -33,7 +33,7 @@ describe('GET /contexts/:id/roles/suggestion', () => {
   const get = () => request(app).get(`/api/contexts/${CTX}/roles/suggestion`);
   const SUGGESTION = {
     role: 'Accountable', principalId: P1, displayName: 'Boss',
-    reason: 'manager of 11 of the 14 members', count: 11, total: 14,
+    reason: 'manages 11 of the 14 members', count: 11, total: 14,
   };
 
   it('400 on a malformed id', async () => {
@@ -61,7 +61,7 @@ describe('GET /contexts/:id/roles/suggestion', () => {
 
   it('a logical application is asked too', async () => {
     queryOne.mockResolvedValueOnce({ id: CTX, contextCategory: 'LogicalApplication', targetType: 'Resource', hasAccountable: false });
-    suggestAccountable.mockResolvedValueOnce({ ...SUGGESTION, reason: 'owner of 4 of its 6 resources' });
+    suggestAccountable.mockResolvedValueOnce({ ...SUGGESTION, reason: 'owns 4 of its 6 resources' });
     expect((await get()).status).toBe(200);
   });
 
